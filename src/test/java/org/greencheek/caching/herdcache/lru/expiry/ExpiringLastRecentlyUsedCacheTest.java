@@ -64,7 +64,76 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
         }, executorService);
 
 
-        assertEquals("Value should be key1","key3",this.awaitForFutureOrElse(val3, null));
+        assertEquals("Value should be key1", "key3", this.awaitForFutureOrElse(val3, null));
+
+    }
+
+    @Test
+    public void testIdleItemExpires() {
+
+        cache = new ExpiringLastRecentlyUsedCache<>(100,100,1000,200, TimeUnit.MILLISECONDS);
+
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key1";
+        }, executorService);
+
+
+
+        assertEquals("Value should be key1", "key1", this.awaitForFutureOrElse(val, null));
+
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key2";
+        }, executorService);
+
+        assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
+
+
+    }
+
+    @Test
+    public void doNotCacheException() {
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+                throw new RuntimeException();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key1";
+        }, executorService);
+
+
+        assertNotEquals("Value should be key1", "key1", this.awaitForFutureOrElse(val, null));
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key2";
+        }, executorService);
+
+        assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
+
+
 
     }
 }

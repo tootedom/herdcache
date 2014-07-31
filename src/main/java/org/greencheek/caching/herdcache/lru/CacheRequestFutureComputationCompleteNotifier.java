@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.promiseupdate;
+package org.greencheek.caching.herdcache.lru;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.SettableFuture;

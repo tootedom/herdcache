@@ -2,8 +2,6 @@ package org.greencheek.caching.herdcache.lru.expiry;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.SettableFuture;
-import org.greencheek.caching.herdcache.lru.expiry.TimedEntry;
-import org.greencheek.caching.herdcache.promiseupdate.CacheValueComputationFailureHandler;
 
 /**
  * Created by dominictootell on 28/07/2014.
@@ -25,6 +23,7 @@ public class CacheEntryRequestFutureComputationCompleteNotifier<V> implements Fu
 
     @Override
     public void onSuccess(V result) {
+        entry.touch();
         cacheRequestFuture.set(result);
     }
 

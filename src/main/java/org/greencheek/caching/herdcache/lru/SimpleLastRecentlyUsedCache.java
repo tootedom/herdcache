@@ -4,8 +4,6 @@ import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.Cache;
-import org.greencheek.caching.herdcache.promiseupdate.CacheRequestFutureComputationCompleteNotifier;
-import org.greencheek.caching.herdcache.promiseupdate.CacheValueComputationFailureHandler;
 
 import java.io.Serializable;
 import java.util.concurrent.ConcurrentMap;

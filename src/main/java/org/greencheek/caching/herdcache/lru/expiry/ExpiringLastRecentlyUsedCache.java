@@ -14,16 +14,28 @@ import java.util.function.Supplier;
  */
 public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Cache<V> {
 
+    private enum TimedEntryType { TTL_ONLY, TTL_WITH_IDLE}
+
     private final ConcurrentMap<String,TimedEntry<V>> store;
-    private final long timeToLiveInNanos;
-    private final long timeToIdleInNanos;
+    private final ExpiryTimes expiryTimes;
+    private final TimedEntryType timedEntryType;
+
     private final CacheValueAndEntryComputationFailureHandler failureHandler;
 
 
     public ExpiringLastRecentlyUsedCache(long maxCapacity,int initialCapacity,
                                          long timeToLive, long timeToIdle, TimeUnit timeUnit) {
-        timeToLiveInNanos = TimeUnit.NANOSECONDS.convert(timeToLive,timeUnit);
-        timeToIdleInNanos = TimeUnit.NANOSECONDS.convert(timeToIdle,timeUnit);
+        expiryTimes = new ExpiryTimes(timeToIdle,timeToLive,timeUnit);
+
+        if(timeToLive<1) {
+            throw new InstantiationError("Time To Live must be greater than 0");
+        }
+
+        if(timeToIdle == 0) {
+            timedEntryType = TimedEntryType.TTL_ONLY;
+        } else {
+            timedEntryType = TimedEntryType.TTL_WITH_IDLE;
+        }
 
         store =  new ConcurrentLinkedHashMap.Builder<String, TimedEntry<V>>()
                 .initialCapacity(initialCapacity)
@@ -36,31 +48,35 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
 
     @Override
     public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService) {
-        SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
-        TimedEntry<V> newEntry = new TimedEntry(toBeComputedFuture);
-
-        TimedEntry<V> previousTimedEntry = store.putIfAbsent(key, newEntry);
-        if(previousTimedEntry==null) {
-            ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
-            Futures.addCallback(computationFuture,
-                    new CacheEntryRequestFutureComputationCompleteNotifier<V>(key,newEntry, toBeComputedFuture, failureHandler));
-            return toBeComputedFuture;
+        TimedEntry<V> value = store.get(key);
+        if(value==null) {
+            return insertTimedEntry(key,computation,executorService);
         } else {
-            if(hasNotExpired(previousTimedEntry)) {
-                previousTimedEntry.refresh();
-                return previousTimedEntry.getFuture();
+            if(value.hasNotExpired(expiryTimes)) {
+                value.touch();
+                return value.getFuture();
             } else {
-                store.remove(key,previousTimedEntry);
                 return insertTimedEntry(key,computation,executorService);
             }
-
         }
+    }
 
+    private TimedEntry<V> createTimedEntry(SettableFuture<V> future) {
+        TimedEntry<V> entry;
+        switch (timedEntryType) {
+            case TTL_WITH_IDLE:
+                entry = new IdleTimedEntryWithExpiry<>(future);
+                break;
+            default:
+                entry = new IdleTimedEntryWithExpiry<>(future);
+                break;
+        }
+        return entry;
     }
 
     private ListenableFuture<V>  insertTimedEntry(String key, Supplier<V> computation, ListeningExecutorService executorService) {
         SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
-        TimedEntry<V> newEntry = new TimedEntry(toBeComputedFuture);
+        TimedEntry<V> newEntry = createTimedEntry(toBeComputedFuture);
 
         FutureCallback<V> callback = new CacheEntryRequestFutureComputationCompleteNotifier<V>(key,newEntry, toBeComputedFuture, failureHandler);
 
@@ -71,8 +87,9 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
             return newEntry.getFuture();
         }
         else {
-            if(hasNotExpired(previousTimedEntry)) {
+            if(previousTimedEntry.hasNotExpired(expiryTimes)) {
                 newEntry.setCreatedAt(previousTimedEntry.getCreatedAt());
+                newEntry.touch();
                 Futures.addCallback(previousTimedEntry.getFuture(),callback);
 
             } else {
@@ -83,11 +100,5 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
         }
     }
 
-    private boolean hasNotExpired(TimedEntry<V> entry) {
-        long now = System.nanoTime();
-        return (
-                (entry.getCreatedAt() + timeToLiveInNanos ) > now &&
-                (entry.getLastAccessed() + timeToIdleInNanos) > now
-        );
-    }
+
 }
