@@ -5,14 +5,11 @@ import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.Cache;
 
-import java.io.Serializable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
-/**
- * Created by dominictootell on 27/07/2014.
- */
-public class SimpleLastRecentlyUsedCache<V extends Serializable> implements Cache<V>, AwaitOnFuture {
+
+public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
 
     private final ConcurrentMap<String,ListenableFuture<V>> store;
     private final CacheValueComputationFailureHandler failureHandler;

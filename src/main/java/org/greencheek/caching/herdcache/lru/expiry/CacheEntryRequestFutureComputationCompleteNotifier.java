@@ -23,7 +23,6 @@ public class CacheEntryRequestFutureComputationCompleteNotifier<V> implements Fu
 
     @Override
     public void onSuccess(V result) {
-        entry.touch();
         cacheRequestFuture.set(result);
     }
 

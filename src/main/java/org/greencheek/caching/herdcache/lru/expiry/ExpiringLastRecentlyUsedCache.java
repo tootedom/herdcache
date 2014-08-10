@@ -4,15 +4,12 @@ import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
 
-import java.io.Serializable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/**
- * Created by dominictootell on 28/07/2014.
- */
-public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Cache<V> {
+
+public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
 
     private enum TimedEntryType { TTL_ONLY, TTL_WITH_IDLE}
 
@@ -31,7 +28,7 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
             throw new InstantiationError("Time To Live must be greater than 0");
         }
 
-        if(timeToIdle == 0) {
+        if(timeToIdle < 1) {
             timedEntryType = TimedEntryType.TTL_ONLY;
         } else {
             timedEntryType = TimedEntryType.TTL_WITH_IDLE;
@@ -68,7 +65,7 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
                 entry = new IdleTimedEntryWithExpiry<>(future);
                 break;
             default:
-                entry = new IdleTimedEntryWithExpiry<>(future);
+                entry = new TimedEntryWithExpiry<>(future);
                 break;
         }
         return entry;
@@ -89,7 +86,6 @@ public class ExpiringLastRecentlyUsedCache<V extends Serializable> implements Ca
         else {
             if(previousTimedEntry.hasNotExpired(expiryTimes)) {
                 newEntry.setCreatedAt(previousTimedEntry.getCreatedAt());
-                newEntry.touch();
                 Futures.addCallback(previousTimedEntry.getFuture(),callback);
 
             } else {
