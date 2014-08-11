@@ -1,3 +1,7 @@
+:toc:
+
+'''
+
 = HerdCache
 
 A Cache using futures to defend against thundering herds.
@@ -15,6 +19,8 @@ times.  As a result the backend resource is put under undue load.
 Storing a future in the cache means that multiple resources for a missing cache value that hasn't been calculated,
 wait on the same future that is executing for the initial/first request for the cache key.
 
+'''
+
 == Cache Types
 
 There are currently two types of Cache that implement the `Cache<V>`:
@@ -29,12 +35,22 @@ The cache has a single method `apply` that takes:
 - An implementation of the http://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html[`Supplier<T>`] functional interface
 - The guava http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListeningExecutorService.html[`ListeningExecutorService`] executor
 
+The method is: `ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService)`
+
+
+The returned value is that of http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture],
+upon which you can attach a callback, or wait for a value to be generated.
+
+
+'''
 
 === SimpleLastRecentlyUsedCache
 
 This cache uses a https://code.google.com/p/concurrentlinkedhashmap/[ConcurrentLinkedHashMap] to store a maximum number
 of values in the cache.  Once the cache hit the maximum number of values, the key that has been Last recently used is
 removed
+
+'''
 
 ==== Examples
 
@@ -114,12 +130,16 @@ assertEquals("Value should be key1","key_new",this.awaitForFutureOrElse(val4, nu
 
 ----
 
+'''
+
 === ExpiringLastRecentlyUsedCache
 
 The difference between `SimpleLastRecentlyUsedCache` and `ExpiringLastRecentlyUsedCache` is that the later has a default
 time to live for the elements that are put in the cache, and also; if desired, a time to idle for the items.
 
 The `timeToLive` and `timeToIdle` are supplied to the constructor of the cache:
+
+'''
 
 ===== Using Only Time to Live
 
@@ -130,6 +150,7 @@ Example, of creating a cache for which the item will live for 1 minute, regardle
 new ExpiringLastRecentlyUsedCache<>(10,60,0, TimeUnit.SECONDS));
 ----
 
+'''
 
 ===== Using Time to Live, and Time to Idle
 
@@ -140,7 +161,35 @@ Example, of creating a cache for which the item will live for 1 minute, but have
 new ExpiringLastRecentlyUsedCache<>(10,60,30, TimeUnit.SECONDS));
 ----
 
-
+'''
 
 === Waiting on futures
 
+The `Cache<V>` interface inherits a Utility interface that gives you a couple of utility methods that allow you to wait
+on futures, for a value to be calculated
+
+- `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue)`
+- `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue, V onTimeoutValue, long duration, TimeUnit timeUnit)`
+
+
+==== Wait on future, with fallback value incase of exception
+
+A the value returned back from a cache apply is that of a `ListenableFuture`.  You can naturally wait on the currently
+executing thread (blocking that thread), for a value to be returned.  This is as follows:
+
+[source,java]
+----
+try {
+   return future.get();
+} catch (Exception e) {
+   return somefallback;
+}
+----
+
+The method `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue)`, remove the ceremony of the try/catch
+block for you.
+
+
+The other method `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue, V onTimeoutValue, long duration, TimeUnit timeUnit)`
+allows you wait a finite amount of time for a value to be returned.  The amount of time elapsed, the `onTimeoutValue` is going to be returned.
+Any other exception results in the `onExceptionValue` being thrown.
