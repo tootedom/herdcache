@@ -20,7 +20,13 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
     private final CacheValueAndEntryComputationFailureHandler failureHandler;
 
 
-    public ExpiringLastRecentlyUsedCache(long maxCapacity,int initialCapacity,
+
+    public ExpiringLastRecentlyUsedCache(int maxCapacity,
+                                         long timeToLive, long timeToIdle, TimeUnit timeUnit) {
+        this(maxCapacity,maxCapacity,timeToLive,timeToIdle,timeUnit);
+    }
+
+    public ExpiringLastRecentlyUsedCache(int maxCapacity,int initialCapacity,
                                          long timeToLive, long timeToIdle, TimeUnit timeUnit) {
         expiryTimes = new ExpiryTimes(timeToIdle,timeToLive,timeUnit);
 

@@ -63,52 +63,84 @@ This can be seen in the following example:
 
 [source,java]
 ----
-        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
-        Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
+ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
 
-        ListenableFuture<String> val = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "key1";
-        }, executorService);
-
-
-        ListenableFuture<String> val2 = cache.apply("key2", () -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "key2";
-        }, executorService);
+ListenableFuture<String> val = cache.apply("Key1", () -> {
+  try {
+     Thread.sleep(1000);
+  } catch (InterruptedException e) {
+     e.printStackTrace();
+  }
+  return "key1";
+}, executorService);
 
 
-        ListenableFuture<String> val3 = cache.apply("key3", () -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "key3";
-        }, executorService);
-
-        ListenableFuture<String> val4 = cache.apply("key1", () -> {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "key_new";
-        }, executorService);
+ListenableFuture<String> val2 = cache.apply("key2", () -> {
+  try {
+     Thread.sleep(500);
+  } catch (InterruptedException e) {
+     e.printStackTrace();
+  }
+  return "key2";
+}, executorService);
 
 
-        assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
-        assertEquals("Value should be key3","key3",this.awaitForFutureOrElse(val3, null));
-        assertEquals("Value should be key1","key_new",this.awaitForFutureOrElse(val4, null));
+ListenableFuture<String> val3 = cache.apply("key3", () -> {
+  try {
+     Thread.sleep(500);
+  } catch (InterruptedException e) {
+     e.printStackTrace();
+  }
+  return "key3";
+}, executorService);
+
+ListenableFuture<String> val4 = cache.apply("key1", () -> {
+  try {
+    Thread.sleep(500);
+  } catch (InterruptedException e) {
+    e.printStackTrace();
+  }
+  return "key_new";
+}, executorService);
+
+
+assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val, null));
+assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
+assertEquals("Value should be key3","key3",this.awaitForFutureOrElse(val3, null));
+
+// Key1 will no longer be in the cache, only key2 and key3
+assertEquals("Value should be key1","key_new",this.awaitForFutureOrElse(val4, null));
 
 ----
+
+=== ExpiringLastRecentlyUsedCache
+
+The difference between `SimpleLastRecentlyUsedCache` and `ExpiringLastRecentlyUsedCache` is that the later has a default
+time to live for the elements that are put in the cache, and also; if desired, a time to idle for the items.
+
+The `timeToLive` and `timeToIdle` are supplied to the constructor of the cache:
+
+===== Using Only Time to Live
+
+Example, of creating a cache for which the item will live for 1 minute, regardless of when they were last used:
+
+[source,java]
+----
+new ExpiringLastRecentlyUsedCache<>(10,60,0, TimeUnit.SECONDS));
+----
+
+
+===== Using Time to Live, and Time to Idle
+
+Example, of creating a cache for which the item will live for 1 minute, but have to be used within the last 30 SECONDS
+
+[source,java]
+----
+new ExpiringLastRecentlyUsedCache<>(10,60,30, TimeUnit.SECONDS));
+----
+
+
+
+=== Waiting on futures
 
