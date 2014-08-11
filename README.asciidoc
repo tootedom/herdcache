@@ -4,3 +4,29 @@ A Cache using futures to defend against thundering herds.
 
 The cache borrows heavily from the concepts, and implementation 
 of caching in http://spray.io/documentation/1.2.1/spray-caching/[spray-caching]
+
+The idea here being that the cache stores a future rather than the value, rather than
+values of a given generic type.  The benefit of this approach is that is that is has the advantage, that it
+nicely takes care of thundering herds/cache miss storm issue.  Which is where many requests
+to a particular cache key (e.g. a resource URI) arrive before the first one could be completed. The result
+being that the cache key is requested ( the processing associated with calculating the value is performed ) multiple
+times.  As a result the backend resource is put under undue load.
+
+Storing a future in the cache means that multiple resources for a missing cache value that hasn't been calculated,
+wait on the same future that is executing for the initial/first request for the cache key.
+
+== Cache Types
+
+There are currently two types of Cache that implement the `Cache<V>`:
+
+- `SimpleLastRecentlyUsedCache`
+- `ExpiringLastRecentlyUsedCache`
+
+
+The cache has a single method `apply` that takes:
+
+- The key to look for
+- An implementation of the http://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html[`Supplier<T>`] functional interface
+- The guava http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListeningExecutorService.html[`ListeningExecutorService`] executor
+
+
