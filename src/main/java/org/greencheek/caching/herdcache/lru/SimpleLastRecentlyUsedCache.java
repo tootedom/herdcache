@@ -2,7 +2,6 @@ package org.greencheek.caching.herdcache.lru;
 
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
-import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.Cache;
 
 import java.util.concurrent.ConcurrentMap;
@@ -13,6 +12,10 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
 
     private final ConcurrentMap<String,ListenableFuture<V>> store;
     private final CacheValueComputationFailureHandler failureHandler;
+
+    public SimpleLastRecentlyUsedCache(int maxCapacity ) {
+        this(maxCapacity,maxCapacity);
+    }
 
     public SimpleLastRecentlyUsedCache() {
         this(100,100);

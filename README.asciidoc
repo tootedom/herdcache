@@ -30,3 +30,85 @@ The cache has a single method `apply` that takes:
 - The guava http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListeningExecutorService.html[`ListeningExecutorService`] executor
 
 
+=== SimpleLastRecentlyUsedCache
+
+This cache uses a https://code.google.com/p/concurrentlinkedhashmap/[ConcurrentLinkedHashMap] to store a maximum number
+of values in the cache.  Once the cache hit the maximum number of values, the key that has been Last recently used is
+removed
+
+==== Examples
+
+[source,java]
+----
+ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
+
+ListenableFuture<String> val = cache.apply("Key1",
+                                           () -> {
+                                                try {
+                                                    Thread.sleep(1000);
+                                                } catch (InterruptedException e) {
+                                                    e.printStackTrace();
+                                                }
+                                                return "key1";
+                                           },
+                                           executorService);
+----
+
+
+The `SimpleLastRecentlyUsedCache` has no expiry on the items in the cache.  It is just limited by the number of
+items in the cache and the item that has been last recently used.
+
+This can be seen in the following example:
+
+[source,java]
+----
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+        Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key1";
+        }, executorService);
+
+
+        ListenableFuture<String> val2 = cache.apply("key2", () -> {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key2";
+        }, executorService);
+
+
+        ListenableFuture<String> val3 = cache.apply("key3", () -> {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key3";
+        }, executorService);
+
+        ListenableFuture<String> val4 = cache.apply("key1", () -> {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "key_new";
+        }, executorService);
+
+
+        assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key3","key3",this.awaitForFutureOrElse(val3, null));
+        assertEquals("Value should be key1","key_new",this.awaitForFutureOrElse(val4, null));
+
+----
+
