@@ -1,6 +1,7 @@
 
 
 = HerdCache
+toc::[]
 :toc:
 :toc-placement: preambe
 
