@@ -3,11 +3,12 @@
 = HerdCache
 
 :toc:
+:toc-title: A Cache using futures to defend against thundering herds.
+:toclevels: 4
 :toc-placement!:
 
 toc::[]
 
-A Cache using futures to defend against thundering herds.
 
 = Overview
 
