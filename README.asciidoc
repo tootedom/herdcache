@@ -65,7 +65,7 @@ upon which you can attach a callback, or wait for a value to be generated:
 
 - Adding a callback:
 [source,java]
------
+----
 // Executes on the calling thread
 Futures.addCallback(future,new FutureCallback<String>() {
                         @Override
