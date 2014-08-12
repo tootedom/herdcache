@@ -1,11 +1,15 @@
 
 
 = HerdCache
-A Cache using futures to defend against thundering herds.
+
 :toc:
 :toc-placement!:
 
 toc::[]
+
+A Cache using futures to defend against thundering herds.
+
+= Overview
 
 The cache borrows heavily from the concepts, and implementation 
 of caching in http://spray.io/documentation/1.2.1/spray-caching/[spray-caching]
@@ -21,6 +25,22 @@ Storing a future in the cache means that multiple resources for a missing cache 
 wait on the same future that is executing for the initial/first request for the cache key.
 
 '''
+
+= Usage
+
+The below details how to use the caching implementations, the differences between them.
+
+
+== Dependency
+
+[source,xml]
+----
+<dependency>
+  <groupId>org.greencheek.caching</groupId>
+  <artifactId>herdcache</artifactId>
+  <version>0.1.0</version>
+</dependency>
+----
 
 == Cache Types
 
@@ -40,8 +60,53 @@ The method is: `ListenableFuture<V> apply(String key, Supplier<V> computation, L
 
 
 The returned value is that of http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture],
-upon which you can attach a callback, or wait for a value to be generated.
+upon which you can attach a callback, or wait for a value to be generated:
 
+
+- Adding a callback:
+[source,java]
+----
+// Executes on the calling thread
+Futures.addCallback(future,new FutureCallback<String>() {
+                        @Override
+                        public void onSuccess(String result) {
+
+                        }
+
+                        @Override
+                        public void onFailure(Throwable t) {
+
+                        }
+                   });
+
+
+// Executes on the passing in executor thread pool
+private final ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+
+Futures.addCallback(val,new FutureCallback<String>() {
+            @Override
+            public void onSuccess(String result) {
+
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+
+            }
+},executorService);
+---
+
+- Waiting for the value (or failure)
+[source,java]
+---
+        try {
+            future.get();
+        } catch (InterruptedException e) {
+
+        } catch (ExecutionException e) {
+
+        }
+---
 
 '''
 
