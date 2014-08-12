@@ -3,8 +3,8 @@
 = HerdCache
 
 :toc:
-:toc-title: A Cache using futures to defend against thundering herds.
 :toclevels: 4
+:toc-title: A Cache using futures to defend against thundering herds.
 :toc-placement!:
 
 toc::[]
@@ -66,7 +66,7 @@ upon which you can attach a callback, or wait for a value to be generated:
 
 - Adding a callback:
 [source,java]
-----
+-----
 // Executes on the calling thread
 Futures.addCallback(future,new FutureCallback<String>() {
                         @Override
@@ -95,11 +95,11 @@ Futures.addCallback(val,new FutureCallback<String>() {
 
             }
 },executorService);
----
+----
 
 - Waiting for the value (or failure)
 [source,java]
----
+----
         try {
             future.get();
         } catch (InterruptedException e) {
@@ -107,7 +107,7 @@ Futures.addCallback(val,new FutureCallback<String>() {
         } catch (ExecutionException e) {
 
         }
----
+----
 
 '''
 
