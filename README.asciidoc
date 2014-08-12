@@ -3,7 +3,9 @@
 = HerdCache
 A Cache using futures to defend against thundering herds.
 :toc:
-:toc-placement: preambe
+:toc-placement!:
+
+toc::[]
 
 The cache borrows heavily from the concepts, and implementation 
 of caching in http://spray.io/documentation/1.2.1/spray-caching/[spray-caching]
