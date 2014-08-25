@@ -4,6 +4,8 @@ import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
 
+import java.sql.Time;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -60,6 +62,21 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
                 return value.getFuture();
             } else {
                 return insertTimedEntry(key,computation,executorService);
+            }
+        }
+    }
+
+    @Override
+    public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
+        TimedEntry<V> value = store.get(key);
+        if(value==null) {
+            return null;
+        } else {
+            if(value.hasNotExpired(expiryTimes)) {
+                value.touch();
+                return value.getFuture();
+            } else {
+                return null;
             }
         }
     }

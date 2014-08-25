@@ -10,7 +10,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.*;
 
 import static org.junit.Assert.*;
@@ -77,6 +79,12 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
 
         assertEquals("Value should be key1", "key3", this.awaitForFutureOrElse(val3, null));
 
+        assertEquals("Value should be key1","key3",this.awaitForFutureOrElse(cache.get("Key1"),null));
+
+        assertEquals("Value should not exist",null,this.awaitForFutureOrElse(cache.get(UUID.randomUUID().toString()),null));
+
+
+
     }
 
     @Test
@@ -115,7 +123,7 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
 
         assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
 
-
+        assertEquals("Value should be null", null,this.awaitForFutureOrElse(cache.get("Key1"), null));
     }
 
     @Test

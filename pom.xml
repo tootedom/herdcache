@@ -50,9 +50,20 @@
         <maven-plugin-plugin.version>3.2</maven-plugin-plugin.version>
         <maven-shade-plugin.version>2.2</maven-shade-plugin.version>
         <maven-site-plugin.version>3.3</maven-site-plugin.version>
+        <logback.version>1.1.1</logback.version>
 
         <guava.version>17.0</guava.version>
         <concurrentlinkedhashmap.version>1.4</concurrentlinkedhashmap.version>
+
+        <spy.version>2.11.4</spy.version>
+        <jsr666e.version>1.1.0</jsr666e.version>
+        <slf4j.version>1.7.6</slf4j.version>
+        <memcachedtest.version>1.0.0</memcachedtest.version>
+        <xxhashing.version>1.2.0</xxhashing.version>
+        <jsnappy.version>0.3</jsnappy.version>
+        <logback.version>1.1.1</logback.version>
+        <junit.version>4.11</junit.version>
+        <netty.version>4.0.21.Final</netty.version>
     </properties>
     <dependencies>
         <dependency>
@@ -65,7 +76,67 @@
             <artifactId>concurrentlinkedhashmap-lru</artifactId>
             <version>${concurrentlinkedhashmap.version}</version>
         </dependency>
+        <dependency>
+            <groupId>net.spy</groupId>
+            <artifactId>spymemcached</artifactId>
+            <version>${spy.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.twitter</groupId>
+            <artifactId>jsr166e</artifactId>
+            <version>${jsr666e.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.jpountz.lz4</groupId>
+            <artifactId>lz4</artifactId>
+            <version>${xxhashing.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.iq80.snappy</groupId>
+            <artifactId>snappy</artifactId>
+            <version>${jsnappy.version}</version>
+        </dependency>
 
+        <dependency>
+            <groupId>de.ruedigermoeller</groupId>
+            <artifactId>fst</artifactId>
+            <version>1.58</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+            <version>3.9.2.Final</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.thimbleware.jmemcached</groupId>
+            <artifactId>jmemcached-core</artifactId>
+            <version>${memcachedtest.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jboss.netty</groupId>
+                    <artifactId>netty</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

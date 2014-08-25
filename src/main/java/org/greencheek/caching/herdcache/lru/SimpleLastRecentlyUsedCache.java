@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
 
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
@@ -43,5 +44,10 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
             return previousFuture;
         }
 
+    }
+
+    @Override
+    public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
+        return store.get(key);
     }
 }
