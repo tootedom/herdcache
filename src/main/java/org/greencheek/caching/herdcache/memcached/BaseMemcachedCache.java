@@ -312,8 +312,6 @@ import java.util.function.Supplier;
                 }
             }
             else  {
-                System.out.println(existingFuture);
-                System.out.flush();
                 logCacheHit(keyString, BaseMemcachedCache.CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
                     return getFutueForStaleDistributedCacheLookup(staleCacheKey,existingFuture,executorService);
