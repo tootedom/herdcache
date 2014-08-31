@@ -6,6 +6,7 @@ import org.greencheek.caching.herdcache.lru.SimpleLastRecentlyUsedCache;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -128,6 +129,9 @@ public class SimpleLastRecentlyUsedCacheTest implements AwaitOnFuture {
         assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val, null));
         assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val2, null));
         assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val3, null));
+
+        assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(cache.get("Key1"),null));
+        assertEquals("Value should not exist",null,this.awaitForFutureOrElse(cache.get(UUID.randomUUID().toString()),null));
 
     }
 
