@@ -77,7 +77,7 @@ public final class StringServer implements TestRule {
     public void before(final String[] message,
                           final TimeUnit delayUnit,
                           final long delay,
-                          boolean sendAllMessages) throws Throwable {
+                          boolean sendAllMessages) {
         final ServerSocket socket = findFreePort();
 
         final ChannelHandler sharedHandler = new StringBasedServerHandler(message,delayUnit,delay,sendAllMessages);
@@ -118,8 +118,11 @@ public final class StringServer implements TestRule {
                 },startDelay,startDelayUnit);
             } else {
                 port = getPort(socket);
-                b.bind(port).sync();
-                outputStartedMessage();
+                try {
+                    b.bind(port).sync();
+                    outputStartedMessage();
+                } catch(InterruptedException e) {
+                }
             }
 
         } finally {
@@ -152,10 +155,14 @@ public final class StringServer implements TestRule {
         outputShutdownMessage();
     }
 
-    private ServerSocket findFreePort() throws IOException {
-        ServerSocket server = new ServerSocket(0,1, InetAddress.getLoopbackAddress());
-        server.setReuseAddress(true);
-        return server;
+    private ServerSocket findFreePort()  {
+        try {
+            ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+            server.setReuseAddress(true);
+            return server;
+        } catch(IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
     }
 
     private int getPortNoClose(ServerSocket server) {

@@ -8,9 +8,7 @@ import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
-import org.greencheek.caching.herdcache.memcached.config.builder.MemcachedCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.BaseSerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.SerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
@@ -24,6 +22,7 @@ import org.junit.Test;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 
@@ -512,13 +511,14 @@ public class TestSimpleMemcachedCaching {
     }
 
     private void testHashAlgorithm(HashAlgorithm algo) {
-        cache = new MemcachedCache<String>(
+        cache = new SpyMemcachedCache<String>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
                         .setHashAlgorithm(algo)
+                        .setKeyPrefix(Optional.of("elastic"))
                         .buildMemcachedConfig()
         );
 
@@ -567,7 +567,7 @@ public class TestSimpleMemcachedCaching {
     @Test
     public void testMemcachedCache() {
 
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -604,7 +604,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testNoCacheKeyHashingMemcachedCache() {
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -643,7 +643,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testMD5LowerKeyHashingMemcachedCache() {
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -681,7 +681,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testSHA256LowerKeyHashingMemcachedCache() {
-        cache = new MemcachedCache<String>(
+        cache = new SpyMemcachedCache<String>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -721,7 +721,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testMD5UpperKeyHashingMemcachedCache() {
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -790,7 +790,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testSerializationInMemcachedCache() {
-        cache = new MemcachedCache<Document>(
+        cache = new SpyMemcachedCache<Document>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -831,7 +831,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testFastSerializationInMemcachedCache() {
-        cache = new MemcachedCache<Document>(
+        cache = new SpyMemcachedCache<Document>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -876,7 +876,7 @@ public class TestSimpleMemcachedCaching {
     public void testLargeCacheByteValue() {
         byte[] largeCacheValueAsBytes = largeCacheValue.getBytes();
 
-        cache = new MemcachedCache<byte[]>(
+        cache = new SpyMemcachedCache<byte[]>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -919,7 +919,7 @@ public class TestSimpleMemcachedCaching {
 
 
 
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))
@@ -957,7 +957,7 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testSHA256UpperKeyHashingMemcachedCache() {
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(60))

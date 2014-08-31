@@ -73,6 +73,7 @@ public class ConfigRetrievalSettingsBuilder {
 
     public ConfigRetrievalSettingsBuilder setIdleReadTimeout(long idleReadTimeout,TimeUnit idleTimeoutTimeUnit) {
         this.idleReadTimeout = idleReadTimeout;
+        this.idleTimeoutTimeUnit = idleTimeoutTimeUnit;
         return this;
     }
 

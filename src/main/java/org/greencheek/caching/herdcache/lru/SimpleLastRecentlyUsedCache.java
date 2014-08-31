@@ -48,6 +48,11 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
 
     @Override
     public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
-        return store.get(key);
+        ListenableFuture future = store.get(key);
+        if(future==null) {
+            return Futures.immediateCheckedFuture(null);
+        } else {
+            return future;
+        }
     }
 }

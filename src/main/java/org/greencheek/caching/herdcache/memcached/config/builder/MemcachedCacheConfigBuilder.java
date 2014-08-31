@@ -8,10 +8,8 @@ import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringP
 import org.greencheek.caching.herdcache.memcached.dns.lookup.AddressByNameHostResolver;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
-import org.greencheek.caching.herdcache.memcached.factory.SpyMemcachedClientFactory;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -19,7 +17,7 @@ import java.util.Optional;
 /**
  * Created by dominictootell on 23/08/2014.
  */
-public abstract class MemcachedCacheConfigBuilder implements CacheConfigBuilder {
+public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfigBuilder<T>> implements CacheConfigBuilder<T> {
 
     private Duration timeToLive =  Duration.ofSeconds(60);
     private int maxCapacity = 1000;
@@ -48,11 +46,11 @@ public abstract class MemcachedCacheConfigBuilder implements CacheConfigBuilder 
     private  int staleMaxCapacity = -1;
     private  Duration staleCacheMemachedGetTimeout = Duration.ZERO;
     private MemcachedClientFactory clientFactory;
+    private boolean removeFutureFromInternalCacheBeforeSettingValue = false;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
        return new MemcachedCacheConfig(
-               createClientFactory(),
                timeToLive,
                maxCapacity,memcachedHosts,
                hashingType,
@@ -64,151 +62,142 @@ public abstract class MemcachedCacheConfigBuilder implements CacheConfigBuilder 
                removeWaitDuration,keyHashType,keyPrefix,asciiOnlyKeys,
                hostStringParser,hostResolver,
                useStaleCache,staleCacheAdditionalTimeToLive,staleCachePrefix,
-               staleMaxCapacity,staleCacheMemachedGetTimeout);
+               staleMaxCapacity,staleCacheMemachedGetTimeout,
+               removeFutureFromInternalCacheBeforeSettingValue);
     }
 
-
-    public MemcachedClientFactory createClientFactory() {
-        if(clientFactory==null) {
-            clientFactory = new SpyMemcachedClientFactory(memcachedHosts,
-                    dnsConnectionTimeout,hostStringParser,hostResolver,createMemcachedConnectionFactory());
-        }
-        return clientFactory;
-    }
-
-    public ConnectionFactory createMemcachedConnectionFactory() {
-        return SpyConnectionFactoryBuilder.createConnectionFactory(
-                hashingType,failureMode,hashAlgorithm,serializingTranscoder,protocol,
-                readBufferSize,keyHashType);
-    }
-
-    public MemcachedCacheConfigBuilder setTimeToLive(Duration timeToLive) {
+    public T setTimeToLive(Duration timeToLive) {
         this.timeToLive = timeToLive;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setMaxCapacity(int maxCapacity) {
+    public T setMaxCapacity(int maxCapacity) {
         this.maxCapacity = maxCapacity;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setMemcachedHosts(String memcachedHosts) {
+    public T setMemcachedHosts(String memcachedHosts) {
         this.memcachedHosts = memcachedHosts;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setHashingType(ConnectionFactoryBuilder.Locator hashingType) {
+    public T setHashingType(ConnectionFactoryBuilder.Locator hashingType) {
         this.hashingType = hashingType;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setFailureMode(FailureMode failureMode) {
+    public T setFailureMode(FailureMode failureMode) {
         this.failureMode = failureMode;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setHashAlgorithm(HashAlgorithm hashAlgorithm) {
+    public T setHashAlgorithm(HashAlgorithm hashAlgorithm) {
         this.hashAlgorithm = hashAlgorithm;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setSerializingTranscoder(Transcoder<Object> serializingTranscoder) {
+    public T setSerializingTranscoder(Transcoder<Object> serializingTranscoder) {
         this.serializingTranscoder = serializingTranscoder;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setProtocol(ConnectionFactoryBuilder.Protocol protocol) {
+    public T setProtocol(ConnectionFactoryBuilder.Protocol protocol) {
         this.protocol = protocol;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setReadBufferSize(int readBufferSize) {
+    public T setReadBufferSize(int readBufferSize) {
         this.readBufferSize = readBufferSize;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setMemcachedGetTimeout(Duration memcachedGetTimeout) {
+    public T setMemcachedGetTimeout(Duration memcachedGetTimeout) {
         this.memcachedGetTimeout = memcachedGetTimeout;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setDnsConnectionTimeout(Duration dnsConnectionTimeout) {
+    public T setDnsConnectionTimeout(Duration dnsConnectionTimeout) {
         this.dnsConnectionTimeout = dnsConnectionTimeout;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setWaitForMemcachedSet(boolean waitForMemcachedSet) {
+    public T setWaitForMemcachedSet(boolean waitForMemcachedSet) {
         this.waitForMemcachedSet = waitForMemcachedSet;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setSetWaitDuration(Duration setWaitDuration) {
+    public T setSetWaitDuration(Duration setWaitDuration) {
         this.setWaitDuration = setWaitDuration;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setAllowFlush(boolean allowFlush) {
+    public T setAllowFlush(boolean allowFlush) {
         this.allowFlush = allowFlush;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setWaitForMemcachedRemove(boolean waitForMemcachedRemove) {
+    public T setWaitForMemcachedRemove(boolean waitForMemcachedRemove) {
         this.waitForMemcachedRemove = waitForMemcachedRemove;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setRemoveWaitDuration(Duration removeWaitDuration) {
+    public T setRemoveWaitDuration(Duration removeWaitDuration) {
         this.removeWaitDuration = removeWaitDuration;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setKeyHashType(KeyHashingType keyHashType) {
+    public T setKeyHashType(KeyHashingType keyHashType) {
         this.keyHashType = keyHashType;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setKeyPrefix(Optional<String> keyPrefix) {
+    public T setKeyPrefix(Optional<String> keyPrefix) {
         this.keyPrefix = keyPrefix;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setAsciiOnlyKeys(boolean asciiOnlyKeys) {
+    public T setAsciiOnlyKeys(boolean asciiOnlyKeys) {
         this.asciiOnlyKeys = asciiOnlyKeys;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setHostStringParser(HostStringParser hostStringParser) {
+    public T setHostStringParser(HostStringParser hostStringParser) {
         this.hostStringParser = hostStringParser;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setHostResolver(HostResolver hostResolver) {
+    public T setHostResolver(HostResolver hostResolver) {
         this.hostResolver = hostResolver;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setUseStaleCache(boolean useStaleCache) {
+    public T setUseStaleCache(boolean useStaleCache) {
         this.useStaleCache = useStaleCache;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setStaleCacheAdditionalTimeToLive(Duration staleCacheAdditionalTimeToLive) {
+    public T setStaleCacheAdditionalTimeToLive(Duration staleCacheAdditionalTimeToLive) {
         this.staleCacheAdditionalTimeToLive = staleCacheAdditionalTimeToLive;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setStaleCachePrefix(String staleCachePrefix) {
+    public T setStaleCachePrefix(String staleCachePrefix) {
         this.staleCachePrefix = staleCachePrefix;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setStaleMaxCapacity(int staleMaxCapacity) {
+    public T setStaleMaxCapacity(int staleMaxCapacity) {
         this.staleMaxCapacity = staleMaxCapacity;
-        return this;
+        return self();
     }
 
-    public MemcachedCacheConfigBuilder setStaleCacheMemachedGetTimeout(Duration staleCacheMemachedGetTimeout) {
+    public T setStaleCacheMemachedGetTimeout(Duration staleCacheMemachedGetTimeout) {
         this.staleCacheMemachedGetTimeout = staleCacheMemachedGetTimeout;
-        return this;
+        return self();
+    }
+
+    public T setRemoveFutureFromInternalCacheBeforeSettingValue(boolean removeFutureFromInternalCacheBeforeSettingValue) {
+        this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
+        return self();
     }
 }

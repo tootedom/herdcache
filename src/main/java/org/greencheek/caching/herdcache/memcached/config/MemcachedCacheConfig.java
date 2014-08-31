@@ -15,7 +15,6 @@ import java.util.Optional;
  */
 public class MemcachedCacheConfig {
 
-    private final MemcachedClientFactory clientFactory;
     private final Duration timeToLive;
     private final int maxCapacity;
     private final String memcachedHosts;
@@ -43,10 +42,10 @@ public class MemcachedCacheConfig {
     private final String staleCachePrefix;
     private final int staleMaxCapacity;
     private final Duration staleCacheMemachedGetTimeout;
+    private final boolean removeFutureFromInternalCacheBeforeSettingValue;
 
 
-    public MemcachedCacheConfig(MemcachedClientFactory factory,
-                                Duration timeToLive,
+    public MemcachedCacheConfig(Duration timeToLive,
                                 int maxCapacity,
                                 String hosts,
                                 ConnectionFactoryBuilder.Locator hashingType,
@@ -71,8 +70,8 @@ public class MemcachedCacheConfig {
                                 Duration staleCacheAdditionalTimeToLive,
                                 String staleCachePrefix,
                                 int staleMaxCapacity,
-                                Duration staleCacheMemachedGetTimeout) {
-        this.clientFactory = factory;
+                                Duration staleCacheMemachedGetTimeout,
+                                boolean removeFutureFromInternalCacheBeforeSettingValue) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -100,6 +99,7 @@ public class MemcachedCacheConfig {
         this.staleCachePrefix = staleCachePrefix;
         this.staleMaxCapacity = staleMaxCapacity;
         this.staleCacheMemachedGetTimeout = staleCacheMemachedGetTimeout;
+        this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
     }
 
     public Duration getTimeToLive() {
@@ -206,11 +206,11 @@ public class MemcachedCacheConfig {
         return staleCacheMemachedGetTimeout;
     }
 
-    public MemcachedClientFactory getClientFactory() {
-        return clientFactory;
-    }
-
     public boolean hasKeyPrefix() {
         return hasKeyPrefix;
+    }
+
+    public boolean isRemoveFutureFromInternalCacheBeforeSettingValue() {
+        return removeFutureFromInternalCacheBeforeSettingValue;
     }
 }

@@ -70,13 +70,13 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
     public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
         TimedEntry<V> value = store.get(key);
         if(value==null) {
-            return null;
+            return Futures.immediateCheckedFuture(null);
         } else {
             if(value.hasNotExpired(expiryTimes)) {
                 value.touch();
                 return value.getFuture();
             } else {
-                return null;
+                return Futures.immediateCheckedFuture(null);
             }
         }
     }

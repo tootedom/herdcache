@@ -54,7 +54,7 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testMemcachedCache() throws InterruptedException {
 
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(1))
@@ -107,7 +107,7 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testMemcachedCacheFunctionsWhenHostsNotAvailable() throws InterruptedException {
 
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:11111")
                         .setTimeToLive(Duration.ofSeconds(1))
@@ -160,7 +160,7 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testStaleMemcachedCacheWithNoSuchItems() throws InterruptedException {
 
-        cache = new MemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(1))
@@ -222,7 +222,7 @@ public class TestStaleMemcachedCaching {
 
         ListenableFuture<String> valStaleEntry = cache.apply("Key1", () -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

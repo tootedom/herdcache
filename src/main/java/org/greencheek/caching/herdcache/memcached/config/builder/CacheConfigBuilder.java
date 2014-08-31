@@ -8,9 +8,11 @@ import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory
 /**
  * Created by dominictootell on 24/08/2014.
  */
-public interface CacheConfigBuilder {
+public interface CacheConfigBuilder<T extends CacheConfigBuilder<T>> {
     public ElastiCacheCacheConfig buildElastiCacheMemcachedConfig();
     public MemcachedCacheConfig buildMemcachedConfig();
-    public MemcachedClientFactory createClientFactory();
     public ConnectionFactory createMemcachedConnectionFactory();
+    public default T self() {
+        return (T)this;
+    }
 }

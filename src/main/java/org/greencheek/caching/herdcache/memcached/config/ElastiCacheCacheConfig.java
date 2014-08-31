@@ -7,6 +7,7 @@ import java.time.Duration;
  */
 public class ElastiCacheCacheConfig {
 
+    private final String elastiCacheConfigHosts;
     private final MemcachedCacheConfig memcachedCacheConfig;
     private final Duration configPollingTime;
     private final Duration initialConfigPollingDelay;
@@ -18,6 +19,7 @@ public class ElastiCacheCacheConfig {
     private final boolean updateConfigVersionOnDnsTimeout;
 
     public ElastiCacheCacheConfig(MemcachedCacheConfig memcachedConf,
+                                  String elastiCacheConfigHosts,
                                   Duration configPollingTime,
             Duration initialConfigPollingDelay,
             Duration connectionTimeoutInMillis,
@@ -27,6 +29,7 @@ public class ElastiCacheCacheConfig {
             int numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
             boolean updateConfigVersionOnDnsTimeout) {
         this.memcachedCacheConfig = memcachedConf;
+        this.elastiCacheConfigHosts = elastiCacheConfigHosts;
         this.configPollingTime = configPollingTime;
         this.initialConfigPollingDelay = initialConfigPollingDelay;
         this.connectionTimeoutInMillis = connectionTimeoutInMillis;
@@ -71,5 +74,9 @@ public class ElastiCacheCacheConfig {
 
     public boolean isUpdateConfigVersionOnDnsTimeout() {
         return updateConfigVersionOnDnsTimeout;
+    }
+
+    public String getElastiCacheConfigHosts() {
+        return elastiCacheConfigHosts;
     }
 }

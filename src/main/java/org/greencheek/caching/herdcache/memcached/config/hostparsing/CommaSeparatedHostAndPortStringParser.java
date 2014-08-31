@@ -1,7 +1,6 @@
 package org.greencheek.caching.herdcache.memcached.config.hostparsing;
 
 import org.greencheek.caching.herdcache.memcached.config.Host;
-import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
