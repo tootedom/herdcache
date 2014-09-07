@@ -528,15 +528,21 @@ import java.util.function.Supplier;
     @Override
     public void clear(boolean waitForClear) {
         clearInternalCaches();
-        Future<Boolean> future = getMemcachedClient().flush();
-        if(waitForClear) {
-            try {
-                future.get();
-            } catch (InterruptedException e) {
-                logger.warn("Interrupted whilst waiting for cache clear to occur",e);
-            } catch (ExecutionException e) {
-                logger.warn("Exception whilst waiting for cache clear to occur",e);
+        if(isEnabled()) {
+            MemcachedClientIF client = getMemcachedClient();
+            if(client!=null) {
+                Future<Boolean> future = client.flush();
+                if(waitForClear) {
+                    try {
+                        future.get();
+                    } catch (InterruptedException e) {
+                        logger.warn("Interrupted whilst waiting for cache clear to occur",e);
+                    } catch (ExecutionException e) {
+                        logger.warn("Exception whilst waiting for cache clear to occur",e);
+                    }
+                }
             }
         }
+
     }
 }
