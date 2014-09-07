@@ -378,7 +378,7 @@ The following show various ways of configuring the cache:
 The `ElastiCacheCacheConfigBuilder` extends the abstract class `MemcachedCacheConfigBuilder` which contains the defaults
 for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to override the defaults:
 
-[width="80%",cols="3,^2,^2,10",options="header"]
+[width="50%",cols="3,^2,^2,10",options="header"]
 |=========================================================
 |Method         |Default | Description |
 |setTimeToLive     |  Duration.ofSeconds(60); | The default expiry time an item with be given if not specified |
