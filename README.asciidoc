@@ -61,7 +61,7 @@ And two types of Cache that implement the `CacheWithExpiry<V>` that extends upon
 - `SpyMemcachedCache<V>`
 - `ElastiCacheMemcachedCache<V>`
 
-=== `Cache<V>` Interface
+== `Cache` Interface
 
 The cache used to have a single method `apply` that takes:
 
@@ -603,7 +603,7 @@ has the potential to break the TEXT protocol key requirements (Hashing the key m
 
 '''
 
-===  Stale Caching
+====  Stale Caching
 
 
 Since 1.0.1 the client supports a stale caching mechanism; this by default is not
@@ -641,17 +641,26 @@ To provide a value of your own, say 10 minutes extra, you can specify this at co
         );
 ----
 
+
+Stale Caching is available in both `SpyMemcachedCache` and `ElastiCacheMemcachedCache`
+
 '''
 
-===   AWS ElastiCache Support
+
+=== `ElastiCacheMemcachedCache` (AWS ElastiCache Support)
 
 Since release 1.0.1 there has been support AWS's ElasticCache memcached cluster:
 
 - http://aws.amazon.com/elasticache/
 - http://docs.aws.amazon.com/AmazonElastiCache/latest/UserGuide/WhatIs.html
 
+
+
+
 This is done by creating an instance of `ElastiCacheMemcachedCache<V>` rather than `SpyMemcachedCache<V>`. An example
 is as follows:
+
+
 
 [source,java]
 ----

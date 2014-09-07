@@ -12,6 +12,7 @@
 
 
     <logger name="net.spy" level="WARN"/>
+    <logger name="com.thimbleware.jmemcached" level="WARN"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />
