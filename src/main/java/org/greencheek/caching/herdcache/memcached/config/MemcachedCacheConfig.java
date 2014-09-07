@@ -4,7 +4,6 @@ import net.spy.memcached.*;
 import net.spy.memcached.transcoders.Transcoder;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
-import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 
 import java.time.Duration;
@@ -40,6 +39,7 @@ public class MemcachedCacheConfig {
     private final int staleMaxCapacity;
     private final Duration staleCacheMemachedGetTimeout;
     private final boolean removeFutureFromInternalCacheBeforeSettingValue;
+    private final boolean hashKeyPrefix;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -65,7 +65,8 @@ public class MemcachedCacheConfig {
                                 String staleCachePrefix,
                                 int staleMaxCapacity,
                                 Duration staleCacheMemachedGetTimeout,
-                                boolean removeFutureFromInternalCacheBeforeSettingValue) {
+                                boolean removeFutureFromInternalCacheBeforeSettingValue,
+                                boolean hashKeyPrefix) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -91,6 +92,7 @@ public class MemcachedCacheConfig {
         this.staleMaxCapacity = staleMaxCapacity;
         this.staleCacheMemachedGetTimeout = staleCacheMemachedGetTimeout;
         this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
+        this.hashKeyPrefix = hashKeyPrefix;
     }
 
     public Duration getTimeToLive() {
@@ -193,6 +195,10 @@ public class MemcachedCacheConfig {
         return removeFutureFromInternalCacheBeforeSettingValue;
     }
 
+    public boolean isHashKeyPrefix() {
+        return hashKeyPrefix;
+    }
+
     public String toString() {
         StringBuilder b = new StringBuilder(256);
         b.append("maxCapacity=").append(getMaxCapacity());
@@ -203,4 +209,6 @@ public class MemcachedCacheConfig {
         return b.toString();
 
     }
+
+
 }

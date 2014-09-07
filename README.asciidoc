@@ -282,7 +282,7 @@ Any other exception results in the `onExceptionValue` being thrown.
 
 '''
 
-== `CacheWithExpiry<V>`
+== `CacheWithExpiry`
 
 There are two implementations of the `CacheWithExpiry<V>` interface:
 
@@ -306,7 +306,7 @@ Duration parameter.  Meaning that keys can have differing cache expiry times (me
 
 '''
 
-=== `SpyMemcachedCache<V>`
+=== `SpyMemcachedCache`
 
 
 The `SpyMemcachedCache<V>` implementation uses the spy memcached java library to communicate with memcached.
@@ -338,7 +338,7 @@ they will wait on the same future to have it's value set to that of the memcache
 If a value does not exist in the memcached, then the given `Supplier<V>` computation is submitted to the provided executor,
 for execution.  Once the value has been calculated, it is sent over the network to memcached for storage.
 
-With this memcached library the value is stored asynchronously in memcached, and the future completed with the computed value
+With this library the value is stored asynchronously in memcached, and the future completed with the computed value
 and sub-sequentially the future is removed from the ConcurrentLinkedHashMap. Therefore, there is a slim time period, between
 the completion of the future and the value being saved in memcached. This means a subsequent request for the same key
 could be a cache miss.
@@ -352,8 +352,9 @@ the CacheConfig for both the `ElastiCacheMemcachedCache` and the `SpyMemcachedCa
 
 The following show various ways of configuring the cache:
 
+'''
 
-==== Constructing the `SpyMemcachedCache<V>`
+==== Constructing the `SpyMemcachedCache`
 
 [source,java]
 ----
@@ -409,9 +410,84 @@ from the internal cache.  This is whether (false) set the future to complete, be
 map firts and then set the future value |
 |=========================================================
 
+'''
 
+==== Specifying the Memcached hosts
+
+By default the host string is `localhost:11211`, however, you can specify a number of hosts to connect to by specifying
+them as a comma separated string in the Builder:
+
+[source,java]
+----
+         CacheWithExpiry<String> cache = new SpyMemcachedCache<>(
+                 new ElastiCacheCacheConfigBuilder()
+                         .setMemcachedHosts("localhost:11211,localhost:11212,localhost:11213"))
+                         .buildMemcachedConfig()
+                 );
+----
+
+
+When the `SpyMemcachedCache` is passed the list of memcached hosts, the ip address for host needs to be resolved.
+By default 3 seconds, per host, is waited for to obtain the ip address.  This can be controlled, like as follows:
+
+
+[source,java]
+----
+         CacheWithExpiry<String> cache = new SpyMemcachedCache<>(
+                 new ElastiCacheCacheConfigBuilder()
+                         .setMemcachedHosts("localhost:11211,localhost:11212,localhost:11213"))
+                         .setDnsConnectionTimeout(Duration.ofSeconds(2))
+                         .buildMemcachedConfig()
+                 );
+----
+
+
+'''
+
+==== Specifying the Expiry of Items in memcached
+
+There are two ways to specify the Expiry of items that are stored in memcached:
+
+- A global Time To Live for the items
+- Passing the Time To Live for cached item in the `apply` method
+
+
+The below for example will set a default of 30 seconds for all items saved in the cache, for which a TimeToLive has not
+been specified:
+
+`ListenableFuture<String> val = cache.apply("Key1", () -> {return "value1";},  executorService);`
+
+[source,java]
+----
+         CacheWithExpiry<String> cache = new SpyMemcachedCache<>(
+                 new ElastiCacheCacheConfigBuilder()
+                         .setMemcachedHosts("localhost:11211"))
+                         .setTimeToLive(Duration.ofSeconds(30))
+                         .buildMemcachedConfig()
+                 );
+----
+
+To specify the TTL on a per time basis, specify the Duration when calling the `apply` method:
+
+`ListenableFuture<String> val = cache.apply("Key1", () -> {return "value1";}, Duration.ofSeconds(10), executorService);`
+
+
+'''
 
 ==== Setting Wait for memcached Set
+
+When an item is not in the cache, or currently being calculated; the cache will execute the `Supplier<V>` computation,
+and store the returned value in memcached.   A future has been created and stored in the internal future calculation cache,
+so that any requests for the same key, wait on the completion of the same future.
+
+With this library the computed cache value is stored asynchronously in memcached, and the future completed with the same value.
+The future is completed, and removed from the internal future calculation cache ( ConcurrentLinkedHashMap ). Therefore,
+there is a slim time period, between the completion of the future and the value being saved in memcached.
+This means a subsequent request for the same key could be a cache miss.
+
+As a result, you can request that the write to memcached be synchronous and a finite period be waited for, for the write
+to take place.  This is done a constructor time, as shown in the following which waits a max of 3 seconds for the set
+to occur.
 
 [source,java]
 ----
@@ -432,4 +508,279 @@ map firts and then set the future value |
          assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val null));
 ----
 
+'''
 
+==== No Expiry
+
+Items in the cache can have no expiry TTL apply by specifying the duration as ZERO
+
+[source,java]
+----
+         CacheWithExpiry<String> cache = new SpyMemcachedCache<>(
+                 new ElastiCacheCacheConfigBuilder()
+                         .setMemcachedHosts("localhost:11211"))
+                         .setTimeToLive(Duration.ofSeconds(60))
+                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                         .setWaitForMemcachedSet(true)
+                         .setSetWaitDuration(Duration.ofSeconds(3))
+                         .buildMemcachedConfig()
+         );
+
+         ListenableFuture<String> val = cache.apply("Key1", () -> {return "value1";}, Duration.ZERO, executorService);
+
+         assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val null));
+----
+
+'''
+
+==== Cache Key
+
+The cache key has to be a string. Memcached has a requirement for makeup of keys,
+when using the TEXT protocol, such that your key object must conform to the following requirements.
+
+- Needs to be a string
+- cannot contain ' '(space), '\r'(return), '\n'(linefeed)
+
+If you are using the BINARY protocol these requirements do not apply. However, you may wish to perform hashing of the
+string representing the key to allow for any character to be used. The cache has the ability for a couple of hash
+representations of the key:
+
+- NONE,
+- NATIVE_XXHASH,
+- JAVA_XXHASH,
+- MD5_UPPER,
+- SHA256_UPPER,
+- MD5_LOWER,
+- SHA256_LOWER
+
+To use either of these you need to specify the hashing method to be used at cache construction time.
+For the best performance, XXHash is recommended:
+
+[source,java]
+----
+cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.MD5_LOWER)
+                        .buildMemcachedConfig()
+        );
+----
+
+'''
+
+==== Cache Key Prefix
+
+When hashing a key, there is a potential for two different Strings to actually end up with the same Hashed value.
+As a result you can add a cache prefix to the cache at construction.
+
+The below specifies a cache prefix of `article`.  This will be prepended to the hashed cache key, the method `setHashKeyPrefix(false)`
+means that the prefix will be added after the cache key has be hashed. setting `setHashKeyPrefix(true)` to true means that
+the prefix will be prepended to the cache key, and then the hashing will take place.  This is the default, as the prefix
+has the potential to break the TEXT protocol key requirements (Hashing the key makes sure this does not occur).
+
+
+[source,java]
+----
+  cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.MD5_LOWER)
+                        .setKeyPrefix(Optional.of("article"))
+                        .setHashKeyPrefix(false)
+                        .buildMemcachedConfig()
+        );
+----
+
+'''
+
+===  Stale Caching
+
+
+Since 1.0.1 the client supports a stale caching mechanism; this by default is not
+enabled as it requires an additional future (via composition) to perform the additional cache lookup.
+It is also an addition lookup on the memcached server, and also will use x2 the memory (items are stored twice in the cache).
+Enabling the stale caching feature is done via the `.setUseStaleCache(true)` method.
+
+The stale caching function is a mini "stale-while-revalidate" mechanism. Without the stale caching enabled,
+when an item expires in the cache, which is popular; then a lot of requests will be waiting on the cache item to be
+regenerated from the backend. This means you can have a spike in a larger than you would like requests.
+
+With stale caching enabled, only one request will regenerate the item from the backend cache. The other requests will use a stale cache.
+The stale cached is ONLY checked if a future exists in the internal cache, meaning that a backend request is in operation to
+calculate the cache item
+
+With stale caching enabled when an item is stored in memcached, it is stored twice. The 2nd time it is stored under a
+different key.  This key is made up of the hashed cache key, and the stale cache key prefix set via the constructor method
+`.setStaleCachePrefix("staleprefix")`.  The default value is that of `stale`.
+
+The item is stored, by default for `setTimeToLive` longer than the original cache item.
+To provide a value of your own, say 10 minutes extra, you can specify this at construction time:
+
+[source,java]
+----
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(1))
+                        .setUseStaleCache(true)
+                        .setStaleCacheAdditionalTimeToLive(Duration.ofMinutes(10))
+                        .setStaleCachePrefix("staleprefix")
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+----
+
+'''
+
+===   AWS ElastiCache Support
+
+Since release 1.0.1 there has been support AWS's ElasticCache memcached cluster:
+
+- http://aws.amazon.com/elasticache/
+- http://docs.aws.amazon.com/AmazonElastiCache/latest/UserGuide/WhatIs.html
+
+This is done by creating an instance of `ElastiCacheMemcachedCache<V>` rather than `SpyMemcachedCache<V>`. An example
+is as follows:
+
+[source,java]
+----
+CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setElastiCacheConfigHosts("yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211")
+                            .setConfigPollingTime(Duration.ofSeconds(10))
+                            .setInitialConfigPollingDelay(Duration.ofSeconds(0))
+                            .setTimeToLive(Duration.ofSeconds(2))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .setDelayBeforeClientClose(Duration.ofSeconds(1))
+                            .setDnsConnectionTimeout(Duration.ofSeconds(2))
+                            .setUseStaleCache(true)
+                            .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+                            .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
+                            .buildElastiCacheMemcachedConfig()
+            );
+----
+
+
+==== Example Simple ElastiCache Test Class
+
+
+The below is a simple java main class the can be run on the command line like the following.  The below
+generates a random integer between 1 and 1000, and applys that value to the cache.
+
+`java -DmaxRand=1000 -Dmillis=500 -Dhosts=herdtesting.jgkygp.cfg.euw1.cache.amazonaws.com:11211 -jar herd-elastitest-0.1.0-SNAPSHOT-relocated-shade.jar`
+
+
+With the given logback.xml, you would have output on the console that will show if I can hit or not occurred:
+
+[source,text]
+----
+71671 [pool-1-thread-1] DEBUG MemcachedCacheHitsLogger - { "cachehit" : "-778756949", "cachetype" : "distributed_cache"}
+71671 [pool-1-thread-1] INFO  ElastiCacheTest - Adding cache value : 633
+71680 [pool-1-thread-1] DEBUG MemcachedCacheHitsLogger - { "cachehit" : "274176478", "cachetype" : "distributed_cache"}
+71680 [pool-1-thread-1] INFO  ElastiCacheTest - Adding cache value : 35
+71690 [pool-1-thread-1] DEBUG MemcachedCacheHitsLogger - { "cachemiss" : "65783974", "cachetype" : "distributed_cache"}
+71690 [pool-1-thread-1] DEBUG o.g.c.h.m.BaseMemcachedCache - set requested for 65783974
+71691 [pool-1-thread-1] INFO  ElastiCacheTest - Adding cache value : 107
+----
+
+
+[source,java]
+----
+package org.greencheek.caching.elasticache;
+
+
+import com.google.common.util.concurrent.MoreExecutors;
+import net.spy.memcached.ConnectionFactoryBuilder;
+import org.greencheek.caching.herdcache.CacheWithExpiry;
+import org.greencheek.caching.herdcache.memcached.ElastiCacheMemcachedCache;
+import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+
+/**
+ *
+ */
+public class ElastiCacheTest {
+
+  private static final ScheduledExecutorService service  = Executors.newSingleThreadScheduledExecutor();
+  private static final Logger logger = LoggerFactory.getLogger("ElastiCacheTest");
+
+
+  private static final CacheWithExpiry cache = new ElastiCacheMemcachedCache<Integer>(
+            new ElastiCacheCacheConfigBuilder()
+            .setElastiCacheConfigHosts(System.getProperty("hosts","localhost:11211"))
+            .setConfigPollingTime(Duration.ofSeconds(Integer.getInteger("pollingTime",60)))
+            .setInitialConfigPollingDelay(Duration.ofSeconds(0))
+            .setTimeToLive(Duration.ofSeconds(10))
+            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+            .setWaitForMemcachedSet(true)
+            .setDelayBeforeClientClose(Duration.ofSeconds(1))
+            .setDnsConnectionTimeout(Duration.ofSeconds(2))
+            .setUseStaleCache(true)
+            .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+            .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
+            .buildElastiCacheMemcachedConfig());
+
+  public static void main(String[] args) {
+      service.scheduleAtFixedRate(()-> {
+              int i = randInt(Integer.getInteger("minRand",1),Integer.getInteger("maxRand",2));
+              logger.info("Adding cache value : {}",cache.awaitForFutureOrElse(
+                      cache.apply(""+i,() -> { return i; },
+                        MoreExecutors.sameThreadExecutor()
+                      ),
+                      MoreExecutors.sameThreadExecutor()),"null");
+      }
+      ,0,Integer.getInteger("millis",1000),TimeUnit.MILLISECONDS);
+
+  }
+
+
+
+  public static int randInt(int min,int max) {
+
+    // NOTE: Usually this should be a field rather than a method
+    // variable so that it is not re-seeded every call.
+      Random rand = new Random();
+
+    // nextInt is normally exclusive of the top value,
+    // so add 1 to make it inclusive
+    return rand.nextInt((max - min) + 1) + min;
+  }
+}
+
+
+<configuration scan="true" scanPeriod="120 seconds" >
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoders are assigned the type
+             ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+        <encoder>
+            <pattern>%-4relative [%thread] %-5level %logger{35} - %msg %n</pattern>
+        </encoder>
+    </appender>
+
+
+    <logger name="net.spy" level="WARN"/>
+
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
+----

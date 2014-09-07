@@ -44,6 +44,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private  Duration staleCacheMemachedGetTimeout = Duration.ZERO;
     private MemcachedClientFactory clientFactory;
     private boolean removeFutureFromInternalCacheBeforeSettingValue = false;
+    private boolean hashKeyPrefix = true;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -60,7 +61,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                hostStringParser,hostResolver,
                useStaleCache,staleCacheAdditionalTimeToLive,staleCachePrefix,
                staleMaxCapacity,staleCacheMemachedGetTimeout,
-               removeFutureFromInternalCacheBeforeSettingValue);
+               removeFutureFromInternalCacheBeforeSettingValue,
+               hashKeyPrefix);
     }
 
     public T setTimeToLive(Duration timeToLive) {
@@ -180,6 +182,11 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setRemoveFutureFromInternalCacheBeforeSettingValue(boolean removeFutureFromInternalCacheBeforeSettingValue) {
         this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
+        return self();
+    }
+
+    public T setHashKeyPrefix(boolean hashKeyPrefix) {
+        this.hashKeyPrefix = hashKeyPrefix;
         return self();
     }
 }

@@ -723,6 +723,84 @@ public class TestSimpleMemcachedCaching {
     }
 
     @Test
+    public void testMD5LowerKeyHashingMemcachedCacheWithCachePrefix() {
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.MD5_LOWER)
+                        .setKeyPrefix(Optional.of("bob"))
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService);
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        }, executorService);
+
+
+        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+    }
+
+    @Test
+    public void testMD5LowerKeyHashingMemcachedCacheWithNoHashingOfCacheKeyPrefix() {
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.MD5_LOWER)
+                        .setKeyPrefix(Optional.of("bob"))
+                        .setHashKeyPrefix(false)
+                        .setAsciiOnlyKeys(true)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService);
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        }, executorService);
+
+
+        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+    }
+
+    @Test
     public void testSHA256LowerKeyHashingMemcachedCache() {
         cache = new SpyMemcachedCache<String>(
                 new ElastiCacheCacheConfigBuilder()

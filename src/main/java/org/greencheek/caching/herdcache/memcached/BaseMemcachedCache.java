@@ -158,7 +158,11 @@ import java.util.function.Supplier;
 
     private String getHashedKey(String key) {
         if(config.hasKeyPrefix()) {
-            return keyHashingFunction.hash(keyprefix + key);
+            if(config.isHashKeyPrefix()) {
+                return keyHashingFunction.hash(keyprefix + key);
+            } else {
+                return keyprefix + keyHashingFunction.hash(key);
+            }
         } else {
             return keyHashingFunction.hash(key);
         }

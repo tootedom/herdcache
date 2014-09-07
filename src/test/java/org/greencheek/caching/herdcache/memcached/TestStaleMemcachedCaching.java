@@ -61,6 +61,7 @@ public class TestStaleMemcachedCaching {
                         .setUseStaleCache(true)
                         .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setStaleCachePrefix("staleprefix")
                         .setWaitForMemcachedSet(true)
                         .buildMemcachedConfig()
         );
