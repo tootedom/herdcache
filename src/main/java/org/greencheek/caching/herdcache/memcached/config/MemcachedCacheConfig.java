@@ -28,9 +28,6 @@ public class MemcachedCacheConfig {
     private final Duration dnsConnectionTimeout;
     private final boolean waitForMemcachedSet;
     private final Duration setWaitDuration;
-    private final boolean allowFlush;
-    private final boolean waitForMemcachedRemove;
-    private final Duration removeWaitDuration;
     private final KeyHashingType keyHashType;
     private final String keyPrefix;
     private final boolean hasKeyPrefix;
@@ -58,9 +55,6 @@ public class MemcachedCacheConfig {
                                 Duration dnsConnectionTimeout,
                                 boolean waitForMemcachedSet,
                                 Duration setWaitDuration,
-                                boolean allowFlush,
-                                boolean waitForMemcachedRemove,
-                                Duration removeWaitDuration,
                                 KeyHashingType keyHashType,
                                 Optional<String> keyPrefix,
                                 boolean asciiOnlyKeys,
@@ -85,9 +79,6 @@ public class MemcachedCacheConfig {
         this.dnsConnectionTimeout = dnsConnectionTimeout;
         this.waitForMemcachedSet  = waitForMemcachedSet;
         this.setWaitDuration = setWaitDuration;
-        this.allowFlush = allowFlush;
-        this.waitForMemcachedRemove = waitForMemcachedRemove;
-        this.removeWaitDuration = removeWaitDuration;
         this.keyHashType = keyHashType;
         this.hasKeyPrefix = keyPrefix.isPresent();
         this.keyPrefix = keyPrefix.orElse("");
@@ -154,18 +145,6 @@ public class MemcachedCacheConfig {
         return setWaitDuration;
     }
 
-    public boolean isAllowFlush() {
-        return allowFlush;
-    }
-
-    public boolean isWaitForMemcachedRemove() {
-        return waitForMemcachedRemove;
-    }
-
-    public Duration getRemoveWaitDuration() {
-        return removeWaitDuration;
-    }
-
     public KeyHashingType getKeyHashType() {
         return keyHashType;
     }
@@ -212,5 +191,16 @@ public class MemcachedCacheConfig {
 
     public boolean isRemoveFutureFromInternalCacheBeforeSettingValue() {
         return removeFutureFromInternalCacheBeforeSettingValue;
+    }
+
+    public String toString() {
+        StringBuilder b = new StringBuilder(256);
+        b.append("maxCapacity=").append(getMaxCapacity());
+        b.append("memcachedHosts=").append(getMemcachedHosts());
+        b.append("isWaitForMemcachedSet=").append(isWaitForMemcachedSet());
+        b.append("waitForSetDuration=").append(getSetWaitDuration());
+        b.append("timeToLive=").append(getTimeToLive());
+        return b.toString();
+
     }
 }

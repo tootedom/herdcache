@@ -38,19 +38,28 @@ The below details how to use the caching implementations, the differences betwee
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>0.1.0</version>
+  <version>1.0.1</version>
 </dependency>
 ----
 
+Please note that 0.1.0 is not backwards compatible with 1.0.1.  1.0.1 extends the Cache interface to include
+a couple of get methods.  Therefore, introduction a breaking change with the old api.
+
 == Cache Types
 
-There are currently two types of Cache that implement the `Cache<V>`:
+There are currently two types of Cache that implement the `Cache<V>` interface:
 
 - `SimpleLastRecentlyUsedCache`
 - `ExpiringLastRecentlyUsedCache`
 
+And two types of Cache that implement the `CacheWithExpiry<V>` that extends upon the `Cache<V>` interface:
 
-The cache has a single method `apply` that takes:
+- `SpyMemcachedCache<V>`
+- `ElastiCacheMemcachedCache<V>`
+
+=== `Cache<V>` Interface
+
+The cache used to have a single method `apply` that takes:
 
 - The key to look for
 - An implementation of the http://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html[`Supplier<T>`] functional interface
@@ -58,10 +67,22 @@ The cache has a single method `apply` that takes:
 
 The method is: `ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService)`
 
-
 The returned value is that of http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture],
 upon which you can attach a callback, or wait for a value to be generated:
 
+The cache now includes two additional methods:
+
+- `public ListenableFuture<V> get(String key)`
+- `public ListenableFuture<V> get(String key,ListeningExecutorService executorService)`
+
+
+Both methods lookup a value in the cache that is associated with a value.  The difference between the `get` and the `apply`,
+is that the `apply` can generate the value, whilst the `get` only looks up in the cache.
+
+Both get methods lookup a cache value, always returning a
+http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture]
+
+The below shows a couple of examples of working with the returned `ListenableFuture`.
 
 - Adding a callback:
 [source,java]
@@ -116,7 +137,6 @@ This cache uses a https://code.google.com/p/concurrentlinkedhashmap/[ConcurrentL
 of values in the cache.  Once the cache hit the maximum number of values, the key that has been Last recently used is
 removed
 
-'''
 
 ==== Examples
 
@@ -231,7 +251,7 @@ new ExpiringLastRecentlyUsedCache<>(10,60,30, TimeUnit.SECONDS));
 
 === Waiting on futures
 
-The `Cache<V>` interface inherits a Utility interface that gives you a couple of utility methods that allow you to wait
+The `Cache<V>` interface inherits a Utility interface (`AwaitOnFuture<V>`) that gives you a couple of utility methods that allow you to wait
 on futures, for a value to be calculated
 
 - `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue)`
@@ -259,3 +279,157 @@ block for you.
 The other method `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue, V onTimeoutValue, long duration, TimeUnit timeUnit)`
 allows you wait a finite amount of time for a value to be returned.  The amount of time elapsed, the `onTimeoutValue` is going to be returned.
 Any other exception results in the `onExceptionValue` being thrown.
+
+'''
+
+== `CacheWithExpiry<V>`
+
+There are two implementations of the `CacheWithExpiry<V>` interface:
+
+- `SpyMemcachedCache<V>`
+- `ElastiCacheMemcachedCache<V>`
+
+
+The second implementation `ElastiCacheMemcachedCache<V>` is an extension of the `SpyMemcachedCache<V>` implementation
+for working with Amazon AWS's memcached support (known as http://aws.amazon.com/elasticache/[ElastiCache]).
+
+The `CacheWithExpiry<V>` contains the method:
+
+[source,java]
+----
+public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService);
+----
+
+The difference between this method and the `apply` that is available in the `Cache<V>` interface, is the addition of the
+Duration parameter.  Meaning that keys can have differing cache expiry times (memcached supports this).
+
+
+'''
+
+=== `SpyMemcachedCache<V>`
+
+
+The `SpyMemcachedCache<V>` implementation uses the spy memcached java library to communicate with memcached.
+The implementation is similar to that of `SimpleLastRecentlyUsedCache` in that it uses a https://code.google.com/p/concurrentlinkedhashmap/[ConcurrentLinkedHashMap]
+to store the cache key against an executing future.
+
+When two requests come for the same key, the future is stored in an internal ConcurrentLinkedHashMap:
+
+[source,java]
+----
+store.putIfAbsent(keyString, future)
+----
+
+If a subsequent request comes in for the same key, and the future has not completed yet, the existing future in the
+ConcurrentLinkedHashMap is returned to the caller.  This way two requests wait on the same executing `Supplier<V> computation`
+
+When constructing the `SpyMemcachedCache`, you can specify the max size of the internal ConcurrentLinkedHash that is used
+to store the concurrently executing futures.
+
+Unlike the `SimpleLastRecentlyUsedCache` implementation, that stores the Completed futures in the ConcurrentLinkedHash
+for subsequent cache hits to obtain the completed future's value, the `SpyMemcachedCache<V>` cache removes the key and associated future from
+the internal `ConcurrentLinkedHash`.  The value of the completed future is instead stored in memcached for subsequent retrieval.
+
+Before the `Supplier<V> computation` is submitted to the passed executor for execution, the memcached cluster is checked
+for the existance of a value for the given key.  If a value is present in memcached, the returned future will be set with
+the obtained value.  This means that if two request comes in for the same key, for which a value is present in memcached
+they will wait on the same future to have it's value set to that of the memcached cache hit.
+
+If a value does not exist in the memcached, then the given `Supplier<V>` computation is submitted to the provided executor,
+for execution.  Once the value has been calculated, it is sent over the network to memcached for storage.
+
+With this memcached library the value is stored asynchronously in memcached, and the future completed with the computed value
+and sub-sequentially the future is removed from the ConcurrentLinkedHashMap. Therefore, there is a slim time period, between
+the completion of the future and the value being saved in memcached. This means a subsequent request for the same key
+could be a cache miss.
+
+It is possible when constructing the `SpyMemcachedCache` to specify to a period of time
+(i.e. make the asynchronous set into memcached call semi synchronous) to wait for the set to occur.
+
+The `SpyMemcachedCache` is created by passing a `MemcachedCacheConfig`.  A `MemcachedCacheConfig` is created via that of
+a `ElastiCacheCacheConfigBuilder` that contains the method `public MemcachedCacheConfig buildMemcachedConfig()` that build
+the CacheConfig for both the `ElastiCacheMemcachedCache` and the `SpyMemcachedCache`
+
+The following show various ways of configuring the cache:
+
+
+==== Constructing the `SpyMemcachedCache<V>`
+
+[source,java]
+----
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:11211")
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            return "value1";
+        }, Duration.ofSeconds(3), executorService);
+
+        assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val null));
+----
+
+
+==== Defaults
+
+The `ElastiCacheCacheConfigBuilder` extends the abstract class `MemcachedCacheConfigBuilder` which contains the defaults
+for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to override the defaults:
+
+[width="80%",cols="3,^2,^2,10",options="header"]
+|=========================================================
+|Method         |Default | Description |
+|setTimeToLive     |  Duration.ofSeconds(60); | The default expiry time an item with be given if not specified |
+|setMaxCapacity    | 1000; | Max number of futures to internal cache whilst a value is being calculated |
+|setMemcachedHosts | "localhost:11211"; | Comma separated host list |
+|setHashingType    | ConnectionFactoryBuilder.Locator.CONSISTENT; | Using consistent hashing, don't change |
+|setFailureMode    | FailureMode.Redistribute; | When an error occurs, what should occur (FailureMode.Retry may suit you better for this) |
+|setHashAlgorithm  | DefaultHashAlgorithm.KETAMA_HASH; | Type of consistent hashing to be used for calculating the memcached node to talk to, don't change |
+|serializingTranscoder | new FastSerializingTranscoder(); | The type of serializer to be used.  Class responsbile for serialising java objects to a byte stream to store in memcached |
+|protocol | ConnectionFactoryBuilder.Protocol.BINARY; | the protocol used for talking to memcached |
+|readBufferSize | DefaultConnectionFactory.DEFAULT_READ_BUFFER_SIZE; | default socket buffer size when talking to memcached, do not change|
+|memcachedGetTimeout  | Duration.ofMillis(2500); | when looking in memcached for a matching key, this is the amount of time to wait before timing out |
+|dnsConnectionTimeout | Duration.ofSeconds(3); | When resolving the memcachedHosts to ip addresses, the amount of time to wait for dns lookup, before ignoring that node |
+|waitForMemcachedSet  | false | Wait for the write to memcached to occur before removing future from internal cache |
+|setWaitDuration | Duration.ofSeconds(2); | amount of time to wait for the memcached set |
+|keyHashType | KeyHashingType.JAVA_XXHASH; | how the cache key is hashed |
+|keyPrefix | Optional.empty() | should the key used in lookup, be prefixed with a string to avoid the unlikely event of a key claash. |
+|asciiOnlyKeys | false; | we only have ascii keys that will be stored in the cache |
+|hostStringParser | new CommaSeparatedHostAndPortStringParser(); | do not change |
+|hostResolver | new AddressByNameHostResolver(); | do not change|
+|useStaleCache | false; | whether stale caching is enabled |
+|staleCacheAdditionalTimeToLive | Duration.ZERO; | The amount of time extra that items will be stored in the stale cached |
+|staleCachePrefix | "stale"; | The prefix for stale keys, to avoid clash |
+|staleMaxCapacity | -1; | The size of the cache for futures for the stae cache is the same as the `maxCapacity` if -1 |
+|staleCacheMemachedGetTimeout | Duration.ZERO | Time to wait for lookups against the stale cache |
+|removeFutureFromInternalCacheBeforeSettingValue | false; | When the `Supplier<V>` computation is completed the future is set with the computed value, and removed
+from the internal cache.  This is whether (false) set the future to complete, before removal for internal future cache.  Or (true), remove the future from
+map firts and then set the future value |
+|=========================================================
+
+
+
+==== Setting Wait for memcached Set
+
+[source,java]
+----
+         cache = new SpyMemcachedCache<>(
+                 new ElastiCacheCacheConfigBuilder()
+                         .setMemcachedHosts("localhost:11211"))
+                         .setTimeToLive(Duration.ofSeconds(60))
+                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                         .setWaitForMemcachedSet(true)
+                         .setSetWaitDuration(Duration.ofSeconds(3))
+                         .buildMemcachedConfig()
+         );
+
+         ListenableFuture<String> val = cache.apply("Key1", () -> {
+             return "value1";
+         }, Duration.ofSeconds(3), executorService);
+
+         assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val null));
+----
+
+

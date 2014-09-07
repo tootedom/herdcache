@@ -640,6 +640,49 @@ public class TestSimpleMemcachedCaching {
 
     }
 
+    @Test
+    public void testDifferenceCachedItemTimes() {
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setSetWaitDuration(Duration.ofSeconds(3))
+                        .setKeyHashType(KeyHashingType.NONE)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            return "value1";
+        }, Duration.ofSeconds(3), executorService);
+
+        ListenableFuture<String> val2 = cache.apply("Key2", () -> {
+            return "value2";
+        }, Duration.ofSeconds(1), executorService);
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        ListenableFuture<String> val1_again = cache.apply("Key1", () -> {
+            return "value1_again";
+        }, Duration.ofSeconds(3), executorService);
+
+        ListenableFuture<String> val2_again = cache.apply("Key2", () -> {
+            return "value2_again";
+        }, Duration.ofSeconds(1), executorService);
+
+
+        assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val1_again, null));
+        assertEquals("Value should be key2","value2_again",cache.awaitForFutureOrElse(val2_again, null));
+
+        assertEquals(2, memcached.getDaemon().getCache().getCurrentItems());
+
+    }
+
 
     @Test
     public void testMD5LowerKeyHashingMemcachedCache() {

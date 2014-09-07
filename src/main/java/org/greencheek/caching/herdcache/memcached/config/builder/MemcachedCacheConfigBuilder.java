@@ -32,9 +32,6 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private  Duration dnsConnectionTimeout = Duration.ofSeconds(3);
     private  boolean waitForMemcachedSet  = false;
     private  Duration setWaitDuration = Duration.ofSeconds(2);
-    private  boolean allowFlush = false;
-    private  boolean waitForMemcachedRemove = false;
-    private  Duration removeWaitDuration = Duration.ofSeconds(2);
     private  KeyHashingType keyHashType = KeyHashingType.JAVA_XXHASH;
     private  Optional<String> keyPrefix = Optional.empty();
     private  boolean asciiOnlyKeys = false;
@@ -58,8 +55,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                hashAlgorithm,serializingTranscoder,
                protocol,readBufferSize,memcachedGetTimeout,
                dnsConnectionTimeout,waitForMemcachedSet,
-               setWaitDuration,allowFlush,waitForMemcachedRemove,
-               removeWaitDuration,keyHashType,keyPrefix,asciiOnlyKeys,
+               setWaitDuration,
+               keyHashType,keyPrefix,asciiOnlyKeys,
                hostStringParser,hostResolver,
                useStaleCache,staleCacheAdditionalTimeToLive,staleCachePrefix,
                staleMaxCapacity,staleCacheMemachedGetTimeout,
@@ -128,21 +125,6 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setSetWaitDuration(Duration setWaitDuration) {
         this.setWaitDuration = setWaitDuration;
-        return self();
-    }
-
-    public T setAllowFlush(boolean allowFlush) {
-        this.allowFlush = allowFlush;
-        return self();
-    }
-
-    public T setWaitForMemcachedRemove(boolean waitForMemcachedRemove) {
-        this.waitForMemcachedRemove = waitForMemcachedRemove;
-        return self();
-    }
-
-    public T setRemoveWaitDuration(Duration removeWaitDuration) {
-        this.removeWaitDuration = removeWaitDuration;
         return self();
     }
 
