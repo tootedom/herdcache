@@ -71,6 +71,8 @@ public class TestNoHostsElastiCacheMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        executorService.shutdownNow();
     }
 
     private void testStaleCaching(CacheWithExpiry cache) {
