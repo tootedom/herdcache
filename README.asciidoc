@@ -26,10 +26,6 @@ wait on the same future that is executing for the initial/first request for the 
 
 '''
 
-= Build Status
-
-image::https://travis-ci.org/tootedom/herdcache.png[Build Status]
-
 = Usage
 
 The below details how to use the caching implementations, the differences between them.
@@ -655,8 +651,6 @@ Since release 1.0.1 there has been support AWS's ElasticCache memcached cluster:
 - http://docs.aws.amazon.com/AmazonElastiCache/latest/UserGuide/WhatIs.html
 
 
-
-
 This is done by creating an instance of `ElastiCacheMemcachedCache<V>` rather than `SpyMemcachedCache<V>`. An example
 is as follows:
 
@@ -681,6 +675,147 @@ CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
             );
 ----
 
+
+====  Setting ElastiCache Hosts
+
+
+The ElastiCache cache works by using the auto discovery mechanism as described here, through that of a
+ElastiCache Configuration Endpoint, which is described here:
+
+http://docs.aws.amazon.com/AmazonElastiCache/latest/UserGuide/AutoDiscovery.AddingToYourClientLibrary.html
+
+You supply to the `ElastiCacheMemcachedCache<V>` cache the url of the ElastiCache Configuration Endpoint.
+The ElastiCache cache uses the netty library (http://netty.io/) to periodically send the config get cluster command
+to the ElastiCache Configuration Endpoint. The ElastiCache keeps a persistent connection open to the ElastiCache
+Configuration Endpoint, sending the command periodically. The ElastiCache Configuration Endpoint returns a
+configuration similar to the following, that details the actually memcached instances that should be connected to:
+
+[source,text]
+----
+    CONFIG cluster 0 147
+    12
+    myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211
+
+    END
+----
+
+When the version number (the second line) increases a new spy memcached instance is created, and the old spy
+memcached instance is scheduled for being closed.  The `ElastiCacheMemcachedCache<V>` continuously polls the
+ElastiCache Configuration Endpoint, for any changes in the number of memcached hosts, or the hosts that are available.
+
+The ElastiCache Configuration Endpoint is specified via the `setElastiCacheConfigHosts(String config)` method on the
+`ElastiCacheCacheConfigBuilder` object:
+
+[source,java]
+----
+CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setElastiCacheConfigHosts("yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211")
+----
+
+For the moment you should only specify 1 configuration host. Currently a cache cluster is only in one Availability Zone.
+A cluster cannot at the moment in AWS span multiple Availability Zones. You can have 3 separate elasticache clusters,
+one in each availability zone, but the cache will only connect to 1 availability zone at any one time.
+
+'''
+
+==== Specifying the polling time
+
+By default the ElastiCache cache polls the ElastiCache Configuration Endpoint for an update to the nodes that make up
+the cluster every 60 seconds. This can be configured via the following methods:
+
+- `.setConfigPollingTime(Duration.ofSeconds(10))`
+- `.setInitialConfigPollingDelay(Duration.ofSeconds(0))`
+
+This can be seen in the following example:
+
+[source,java]
+----
+private static final CacheWithExpiry cache = new ElastiCacheMemcachedCache<Integer>(
+            new ElastiCacheCacheConfigBuilder()
+            .setElastiCacheConfigHosts(System.getProperty("hosts","localhost:11211"))
+            .setConfigPollingTime(Duration.ofSeconds(Integer.getInteger("pollingTime",60)))
+            .setInitialConfigPollingDelay(Duration.ofSeconds(0))
+            .setTimeToLive(Duration.ofSeconds(10))
+            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+            .setWaitForMemcachedSet(true)
+            .setDelayBeforeClientClose(Duration.ofSeconds(1))
+            .setDnsConnectionTimeout(Duration.ofSeconds(2))
+            .setUseStaleCache(true)
+            .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+            .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
+            .buildElastiCacheMemcachedConfig());
+----
+
+'''
+
+==== Persistent Connection to ElastiCache Configuration Endpoint
+
+The ElastiCache uses a persistent connection to the ElastiCache Configuration Endpoint. If the connection is lost,
+the client will automatically reconnect. The client will wait for a period (default 5 seconds) before reconnecting.
+This can be changed by specifying the delay via the method:  `.setReconnectDelay(Duration.ofSeconds(10))`.
+
+If the client does also receive any data from the ElastiCache Configuration Endpoint, a reconnection will be made;
+this idle period is controlled by the setting idleReadTimeout. This is set to 125 seconds by default.
+If you modify this setting you `SHOULD NOT` set it lower that the polling duration; as you will just end up in the
+persistent connection not being persistent.
+
+`.setReconnectDelay(Duration.ofSeconds(5))`
+`.setIdleReadTimeout(Duration.ofSeconds(125))`
+
+If the ElastiCache Configuration Endpoint is in some way returning invalid configurations,
+then the client will reconnect to the Configuration Endpoint. By default it takes 3 consecutive invalid
+configurations before the client will reconnect. This is controlled by the method:
+`setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect(int number)`
+
+==== Cluster nodes update and closing old SpyMemcached client
+
+When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created,
+and the old client is closed. There a delay before the old client is closed, as it may still be in use
+(i.e. network requests may still be executing). By default the delay is 10 second; this can be change by specifying the
+following config builder method `.setDelayBeforeClientClose(Duration.ofSeconds(1))`
+
+
+==== ElastiCache Configuration Endpoint timeout
+
+By default the client will wait for 3 seconds for a connection to the ElastiCache Configuration Endpoint.
+This can be changed by the following following config builder method `.setConnectionTimeoutInMillis(Duration.ofSeconds(2))`
+
+
+==== Host lookup
+
+When the ElastiCache Configuration Endpoint returns the configuration information it returns the hostname,
+and it may send with it the IP address.
+
+[source,text]
+----
+    CONFIG cluster 0 147
+    12
+    myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211
+
+    END
+----
+
+If the IP address is not returned the client will perform a DNS lookup on the hostname.
+By default the timeout is 3 seconds. This can be changed with the builder method `.setDnsConnectionTimeout(Duration.ofSeconds(2))`
+
+If a DNS lookup fails, due to connection timeout (or a temporary network issue), or otherwise. By default that host will
+be excluded from the list of memcached hosts the cache client will be connected to. As a result, this will not change
+unless you update the cluster configuration and a new version of the config is supplied by the ElastiCache Configuration Endpoint.
+
+A builder configuration property `.setUpdateConfigVersionOnDnsTimeout(true)` allows you to change this behaviour when a
+host is not resolved to an IP.  The resolution of a host's dns may be a temporary issue, and on the next polling config
+the dns will be resolvable. If you set the builder property to false `.setUpdateConfigVersionOnDnsTimeout(false)`
+
+Then the memcached client will be updated to point to the hosts mentioned in the config; but if any host resolution fails;
+the client will not record the current configuration's version number. Meaning on the next poll for the current cluster
+configuration, the memcached client will again be recreated, to point to the hosts specified in configuration.
+
+Note if the dns resolution is constantly failing then client memcached client will constantly be re-created each time
+the configuration polling occurs. No validation of the previously resolved hosts, and the current resolved hosts is performed.
+The client will just be recreated.
+
+'''
 
 ==== Example Simple ElastiCache Test Class
 

@@ -266,6 +266,7 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <reuseForks>false</reuseForks>
+                    <forkMode>always</forkMode>
                     <!--
                     Sets the VM argument line used when unit tests are run.
                     Set by jacoco
