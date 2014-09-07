@@ -26,6 +26,11 @@ wait on the same future that is executing for the initial/first request for the 
 
 '''
 
+= Build Status
+
+### Status
+[![Build Status](https://travis-ci.org/tootedom/herdcache.png)](https://travis-ci.org/tootedom/herdcache)
+
 = Usage
 
 The below details how to use the caching implementations, the differences between them.
