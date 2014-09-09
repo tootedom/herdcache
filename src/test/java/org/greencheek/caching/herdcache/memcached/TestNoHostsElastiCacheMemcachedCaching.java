@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -288,6 +289,8 @@ public class TestNoHostsElastiCacheMemcachedCaching {
 
             testNoCaching(cache);
 
+            assertNotNull(memcached1);
+            assertNotNull(memcached2);
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()==0);
             assertTrue(memcached2.getDaemon().getCache().getCurrentItems()==0);
 
@@ -299,6 +302,13 @@ public class TestNoHostsElastiCacheMemcachedCaching {
             }
         }
 
+    }
+
+    private void assertNotNull(MemcachedDaemonWrapper wrapper) {
+        org.junit.Assert.assertNotNull(wrapper);
+        org.junit.Assert.assertNotNull(wrapper.getDaemon());
+        org.junit.Assert.assertNotNull(wrapper.getDaemon().getCache());
+        org.junit.Assert.assertNotNull(wrapper.getDaemon().getCache().getCurrentItems());
     }
 
     @Test
