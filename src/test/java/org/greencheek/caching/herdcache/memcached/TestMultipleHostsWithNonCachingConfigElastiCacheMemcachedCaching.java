@@ -201,6 +201,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                clearCache(memcached1);
+                clearCache(memcached2);
             }
 
             try {
@@ -216,6 +218,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                clearCache(memcached1);
+                clearCache(memcached2);
             }
 
             try {
@@ -231,6 +235,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                clearCache(memcached1);
+                clearCache(memcached2);
             }
 
             try {
@@ -246,6 +252,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                clearCache(memcached1);
+                clearCache(memcached2);
             }
 
 
@@ -268,6 +276,17 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
             }
         }
 
+    }
+
+
+    private void clearCache(MemcachedDaemonWrapper wrapper) {
+        if(getItems(wrapper)>0) {
+            wrapper.getDaemon().getCache().flush_all();
+        }
+    }
+
+    private long getItems(MemcachedDaemonWrapper wrapper) {
+        return wrapper.getDaemon().getCache().getCurrentItems();
     }
 
     @Test

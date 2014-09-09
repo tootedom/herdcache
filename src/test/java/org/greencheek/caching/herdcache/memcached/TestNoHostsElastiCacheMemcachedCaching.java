@@ -279,6 +279,8 @@ public class TestNoHostsElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                clearCache(memcached1);
+                clearCache(memcached2);
             }
 
             try {
@@ -291,8 +293,8 @@ public class TestNoHostsElastiCacheMemcachedCaching {
 
             assertNotNull(memcached1);
             assertNotNull(memcached2);
-            assertTrue(memcached1.getDaemon().getCache().getCurrentItems()==0);
-            assertTrue(memcached2.getDaemon().getCache().getCurrentItems()==0);
+            assertTrue(getItems(memcached1)==0);
+            assertTrue(getItems(memcached2)==0);
 
         }
         finally {
@@ -302,6 +304,16 @@ public class TestNoHostsElastiCacheMemcachedCaching {
             }
         }
 
+    }
+
+    private void clearCache(MemcachedDaemonWrapper wrapper) {
+        if(getItems(wrapper)>0) {
+            wrapper.getDaemon().getCache().flush_all();
+        }
+    }
+
+    private long getItems(MemcachedDaemonWrapper wrapper) {
+        return wrapper.getDaemon().getCache().getCurrentItems();
     }
 
     private void assertNotNull(MemcachedDaemonWrapper wrapper) {

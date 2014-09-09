@@ -45,6 +45,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private MemcachedClientFactory clientFactory;
     private boolean removeFutureFromInternalCacheBeforeSettingValue = false;
     private boolean hashKeyPrefix = true;
+    private Duration waitForRemove = Duration.ZERO;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -62,7 +63,13 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                useStaleCache,staleCacheAdditionalTimeToLive,staleCachePrefix,
                staleMaxCapacity,staleCacheMemachedGetTimeout,
                removeFutureFromInternalCacheBeforeSettingValue,
-               hashKeyPrefix);
+               hashKeyPrefix,
+               waitForRemove);
+    }
+
+    public T setWaitForRemove(Duration durationToWaitFor) {
+        this.waitForRemove = durationToWaitFor;
+        return self();
     }
 
     public T setTimeToLive(Duration timeToLive) {

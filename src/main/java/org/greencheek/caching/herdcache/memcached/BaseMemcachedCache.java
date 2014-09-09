@@ -527,6 +527,10 @@ import java.util.function.Supplier;
         }
     }
 
+    public void clear() {
+        clear(false);
+    }
+
     @Override
     public void clear(boolean waitForClear) {
         clearInternalCaches();
@@ -535,13 +539,21 @@ import java.util.function.Supplier;
             MemcachedClientIF cli = client.getClient();
             if(client!=null) {
                 Future<Boolean> future = cli.flush();
-                if(waitForClear) {
+                long millisToWait = config.getWaitForRemove().toMillis();
+                if(waitForClear || millisToWait>0) {
                     try {
-                        future.get();
+                        if(millisToWait>0) {
+                            future.get(millisToWait,TimeUnit.MILLISECONDS);
+                        }
+                        else {
+                            future.get();
+                        }
                     } catch (InterruptedException e) {
                         logger.warn("Interrupted whilst waiting for cache clear to occur",e);
                     } catch (ExecutionException e) {
                         logger.warn("Exception whilst waiting for cache clear to occur",e);
+                    } catch (TimeoutException e) {
+                        logger.warn("Timeout whilst waiting for cache clear to occur",e);
                     }
                 }
             }

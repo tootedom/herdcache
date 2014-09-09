@@ -5,4 +5,5 @@ package org.greencheek.caching.herdcache.memcached;
  */
 public interface ClearableCache {
     public void clear(boolean waitForClear);
+    public void clear();
 }

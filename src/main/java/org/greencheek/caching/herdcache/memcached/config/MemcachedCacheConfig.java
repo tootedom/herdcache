@@ -40,6 +40,7 @@ public class MemcachedCacheConfig {
     private final Duration staleCacheMemachedGetTimeout;
     private final boolean removeFutureFromInternalCacheBeforeSettingValue;
     private final boolean hashKeyPrefix;
+    private final Duration waitForRemove;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -66,7 +67,8 @@ public class MemcachedCacheConfig {
                                 int staleMaxCapacity,
                                 Duration staleCacheMemachedGetTimeout,
                                 boolean removeFutureFromInternalCacheBeforeSettingValue,
-                                boolean hashKeyPrefix) {
+                                boolean hashKeyPrefix,
+                                Duration waitForRemove) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -93,6 +95,7 @@ public class MemcachedCacheConfig {
         this.staleCacheMemachedGetTimeout = staleCacheMemachedGetTimeout;
         this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
         this.hashKeyPrefix = hashKeyPrefix;
+        this.waitForRemove = waitForRemove;
     }
 
     public Duration getTimeToLive() {
@@ -211,4 +214,7 @@ public class MemcachedCacheConfig {
     }
 
 
+    public Duration getWaitForRemove() {
+        return waitForRemove;
+    }
 }
