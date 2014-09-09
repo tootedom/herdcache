@@ -1,6 +1,7 @@
 package org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection;
 
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ElastiCacheHost;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
 
 import java.util.List;
 

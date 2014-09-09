@@ -12,6 +12,7 @@ import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationComplet
 import org.greencheek.caching.herdcache.lru.CacheValueComputationFailureHandler;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 import org.slf4j.Logger;
@@ -112,11 +113,6 @@ import java.util.function.Supplier;
 
     }
 
-    private MemcachedClientIF getMemcachedClient() {
-        return clientFactory.getClient();
-    }
-
-
     private boolean isEnabled() {
         return clientFactory.isEnabled();
     }
@@ -180,12 +176,13 @@ import java.util.function.Supplier;
 
     }
 
-    private void writeToDistributedCache(String key, V value,
+    private void writeToDistributedCache(ReferencedClient client,
+                                         String key, V value,
                                          Duration timeToLive, boolean waitForMemcachedSet) {
         int entryTTLInSeconds = (int)getDuration(timeToLive);
 
         if( waitForMemcachedSet ) {
-            Future<Boolean> futureSet = getMemcachedClient().set(key, entryTTLInSeconds, value);
+            Future<Boolean> futureSet = client.getClient().set(key, entryTTLInSeconds, value);
             try {
                 futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
@@ -194,7 +191,7 @@ import java.util.function.Supplier;
 
         } else {
             try {
-                getMemcachedClient().set(key, entryTTLInSeconds, value);
+                client.getClient().set(key, entryTTLInSeconds, value);
             } catch (Exception e) {
                 logger.warn("Exception waiting for memcached set to occur");
             }
@@ -228,8 +225,8 @@ import java.util.function.Supplier;
         }
     }
 
-    private ListenableFuture<V> getFromDistributedCache(String key,ListeningExecutorService ec) {
-        return ec.submit(() -> getFromDistributedCache(key));
+    private ListenableFuture<V> getFromDistributedCache(ReferencedClient client,String key,ListeningExecutorService ec) {
+        return ec.submit(() -> getFromDistributedCache(client,key));
     }
 
 
@@ -241,7 +238,8 @@ import java.util.function.Supplier;
     @Override
     public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
         String keyString = getHashedKey(key);
-        if(!isEnabled()) {
+        ReferencedClient client = clientFactory.getClient();
+        if(!client.isAvailable()) {
             warnCacheDisabled();
             ListenableFuture<V> previousFuture = store.get(key);
             if(previousFuture==null) {
@@ -254,12 +252,12 @@ import java.util.function.Supplier;
         } else {
             ListenableFuture<V> future = store.get(keyString);
             if(future==null) {
-                return getFromDistributedCache(keyString,executorService);
+                return getFromDistributedCache(client,keyString,executorService);
             }
             else {
                 logCacheHit(keyString, BaseMemcachedCache.CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
-                    return getFutueForStaleDistributedCacheLookup(createStaleCacheKey(keyString), future, executorService);
+                    return getFutueForStaleDistributedCacheLookup(client,createStaleCacheKey(keyString), future, executorService);
                 } else {
                     return future;
                 }
@@ -275,7 +273,8 @@ import java.util.function.Supplier;
 
         String keyString = getHashedKey(key);
 
-        if(!isEnabled()) {
+        ReferencedClient client = clientFactory.getClient();
+        if(!client.isAvailable()) {
             warnCacheDisabled();
             return scheduleValueComputation(key,computation,executorService);
         }
@@ -296,11 +295,11 @@ import java.util.function.Supplier;
             //      val existingFuture : Future[Serializable] = store.get(keyString)
             if(existingFuture==null) {
                 // check memcached.
-                Object cachedObject = getFromDistributedCache(keyString);
+                Object cachedObject = getFromDistributedCache(client,keyString);
                 if(cachedObject == null)
                 {
                     logger.debug("set requested for {}", keyString);
-                    return cacheWriteFunction(computation, promise,
+                    return cacheWriteFunction(client,computation, promise,
                             keyString, staleCacheKey,
                             timeToLive,staleCacheExpiry,executorService);
                 }
@@ -318,7 +317,7 @@ import java.util.function.Supplier;
             else  {
                 logCacheHit(keyString, BaseMemcachedCache.CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
-                    return getFutueForStaleDistributedCacheLookup(staleCacheKey,existingFuture,executorService);
+                    return getFutueForStaleDistributedCacheLookup(client,staleCacheKey,existingFuture,executorService);
                 } else {
                     return existingFuture;
                 }
@@ -336,7 +335,8 @@ import java.util.function.Supplier;
      * @param ec  The require execution context to run the stale cache key.
      * @return  A future that will result in the stored Serializable object
      */
-    private ListenableFuture<V> getFutueForStaleDistributedCacheLookup(String key,
+    private ListenableFuture<V> getFutueForStaleDistributedCacheLookup(ReferencedClient client,
+                                                                       String key,
                                                                        ListenableFuture<V> backendFuture,
                                                                        ListeningExecutorService ec) {
 
@@ -346,7 +346,7 @@ import java.util.function.Supplier;
         ListenableFuture<V> existingFuture = staleStore.putIfAbsent(key, promise);
 
         if(existingFuture == null) {
-            ec.submit(() -> getFromStaleDistributedCache(key, promise, backendFuture));
+            ec.submit(() -> getFromStaleDistributedCache(client,key, promise, backendFuture));
             return promise;
         }
         else {
@@ -362,11 +362,12 @@ import java.util.function.Supplier;
      * @param promise the promise on which requests are waiting.
      * @param backendFuture the future that is running the long returning calculation that creates a fresh entry.
      */
-    private void getFromStaleDistributedCache(String key,
+    private void getFromStaleDistributedCache(ReferencedClient client,
+                                              String key,
                                               SettableFuture<V> promise,
                                               ListenableFuture<V> backendFuture) {
 
-        Object item = getFromDistributedCache(key,this.staleCacheMemachedGetTimeoutInMillis, BaseMemcachedCache.CACHE_TYPE_STALE_CACHE);
+        Object item = getFromDistributedCache(client,key,this.staleCacheMemachedGetTimeoutInMillis, BaseMemcachedCache.CACHE_TYPE_STALE_CACHE);
 
         if(item==null) {
             Futures.addCallback(backendFuture, new FutureCallback<V>() {
@@ -411,7 +412,8 @@ import java.util.function.Supplier;
      * @param itemExpiry the expiry for the item
      * @return
      */
-    private ListenableFuture<V> cacheWriteFunction(Supplier<V> computation,
+    private ListenableFuture<V> cacheWriteFunction(ReferencedClient client,
+                                                   Supplier<V> computation,
                                                    final SettableFuture<V> promise,
                                                    final String key, String staleCacheKey,
                                                    Duration itemExpiry,
@@ -426,10 +428,10 @@ import java.util.function.Supplier;
                         try {
                             if (config.isUseStaleCache()) {
                                 // overwrite the stale cache entry
-                                writeToDistributedCache(staleCacheKey, result, staleItemExpiry, false);
+                                writeToDistributedCache(client,staleCacheKey, result, staleItemExpiry, false);
                             }
                             // write the cache entry
-                            writeToDistributedCache(key, result, itemExpiry, config.isWaitForMemcachedSet());
+                            writeToDistributedCache(client,key, result, itemExpiry, config.isWaitForMemcachedSet());
 
                         } catch (Exception e) {
                             logger.error("problem setting key {} in memcached", key);
@@ -469,11 +471,11 @@ import java.util.function.Supplier;
      * @param cacheType The cache type.  This is output to the log when a hit or miss is logged
      * @return
      */
-    private V getFromDistributedCache(String key, long timeoutInMillis,
-                                           String cacheType) {
+    private V getFromDistributedCache(ReferencedClient client,String key, long timeoutInMillis,
+                                      String cacheType) {
         Object serialisedObj = null;
         try {
-            Future<Object> future =  getMemcachedClient().asyncGet(key);
+            Future<Object> future =  client.getClient().asyncGet(key);
             Object cacheVal = future.get(timeoutInMillis,TimeUnit.MILLISECONDS);
             if(cacheVal==null){
                 logCacheMiss(key,cacheType);
@@ -501,8 +503,8 @@ import java.util.function.Supplier;
      * @param key The key under which to find a cached object.
      * @return The cached object
      */
-    private V getFromDistributedCache(String key) {
-        return getFromDistributedCache(key,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
+    private V getFromDistributedCache(ReferencedClient client,String key) {
+        return getFromDistributedCache(client,key,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
     }
 
 
@@ -528,10 +530,11 @@ import java.util.function.Supplier;
     @Override
     public void clear(boolean waitForClear) {
         clearInternalCaches();
-        if(isEnabled()) {
-            MemcachedClientIF client = getMemcachedClient();
+        ReferencedClient client = clientFactory.getClient();
+        if(client.isAvailable()) {
+            MemcachedClientIF cli = client.getClient();
             if(client!=null) {
-                Future<Boolean> future = client.flush();
+                Future<Boolean> future = cli.flush();
                 if(waitForClear) {
                     try {
                         future.get();

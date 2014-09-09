@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public class SpyMemcachedClientFactory implements MemcachedClientFactory {
 
-    private final Optional<MemcachedClientIF> memcached;
+    private final ReferencedClient memcached;
     private final HostStringParser hostStringParser;
     private final Duration dnsConnectionTimeout;
     private final HostResolver hostResolver;
@@ -39,39 +39,39 @@ public class SpyMemcachedClientFactory implements MemcachedClientFactory {
     }
 
 
-    private Optional<MemcachedClientIF> createMemcachedClient(String hosts) {
+    private ReferencedClient createMemcachedClient(String hosts) {
         List<Host> parsedHosts  =  hostStringParser.parseMemcachedNodeList(hosts);
 
         if(parsedHosts==null || parsedHosts.size()==0) {
-            return Optional.empty();
+            return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
         } else {
             List<InetSocketAddress> resolvedHosts = hostResolver.returnSocketAddressesForHostNames(parsedHosts,dnsConnectionTimeout);
             if(resolvedHosts==null || resolvedHosts.size()==0) {
-                return Optional.empty();
+                return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
             } else {
                 try {
-                    return Optional.of(new MemcachedClient(connectionFactory,resolvedHosts));
+                    return new ReferencedClient(true,resolvedHosts,new MemcachedClient(connectionFactory,resolvedHosts));
                 } catch (IOException e) {
-                    return Optional.empty();
+                    return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
                 }
             }
         }
     }
 
     @Override
-    public MemcachedClientIF getClient() {
-        return memcached.orElse(null);
+    public ReferencedClient getClient() {
+        return memcached;
     }
 
     @Override
     public boolean isEnabled() {
-        return memcached.isPresent();
+        return memcached.isAvailable();
     }
 
     @Override
     public void shutdown() {
         if(isEnabled()) {
-            memcached.get().shutdown();
+            memcached.getClient().shutdown();
         }
     }
 }

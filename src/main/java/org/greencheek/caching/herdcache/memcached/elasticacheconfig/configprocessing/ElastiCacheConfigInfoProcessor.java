@@ -2,7 +2,7 @@ package org.greencheek.caching.herdcache.memcached.elasticacheconfig.configproce
 
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.confighandler.ConfigInfoProcessor;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.configparsing.ElastiCacheConfigParser;
-import org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection.ReferencedClient;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection.UpdateClientService;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ConfigInfo;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ElastiCacheHost;

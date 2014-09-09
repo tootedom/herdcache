@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection;
+package org.greencheek.caching.herdcache.memcached.factory;
 
 import net.spy.memcached.MemcachedClientIF;
 
@@ -10,7 +10,6 @@ import java.util.List;
  * Created by dominictootell on 26/08/2014.
  */
 public class ReferencedClient {
-
 
     public static final ReferencedClient UNAVAILABLE_REFERENCE_CLIENT = new ReferencedClient(false, Collections.<InetSocketAddress>emptyList(),null);
 

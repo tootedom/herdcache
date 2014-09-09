@@ -27,10 +27,6 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
     private final Duration initialConfigPollingDelay;
     private final Duration idleReadTimeout;
     private final Duration reconnectDelay;
-    private final Duration delayBeforeClientClose;
-    private final HostResolver dnsLookupService;
-    private final Duration dnsLookupTimeout;
-    private final boolean updateConfigVersionOnDnsTimeout;
     private final int numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
     private final Duration connectionTimeout;
     private final ConfigInfoProcessor suppliedConfigInfoProcessor;
@@ -56,10 +52,6 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
         this.initialConfigPollingDelay = initialConfigPollingDelay;
         this.idleReadTimeout = idleReadTimeout;
         this.reconnectDelay = reconnectDelay;
-        this.delayBeforeClientClose = delayBeforeClientClose;
-        this.dnsLookupService = dnsLookupService;
-        this.dnsLookupTimeout = dnsLookupTimeout;
-        this.updateConfigVersionOnDnsTimeout = updateConfigVersionOnDnsTimeout;
         this.numberOfConsecutiveInvalidConfigurationsBeforeReconnect = numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
         this.connectionTimeout = connectionTimeout;
 
@@ -76,8 +68,8 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
     }
 
     @Override
-    public MemcachedClientIF getClient() {
-        return memcachedClientHolder.getClient().getClient();
+    public ReferencedClient getClient() {
+        return memcachedClientHolder.getClient();
     }
 
     @Override

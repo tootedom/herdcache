@@ -18,6 +18,7 @@ import net.spy.memcached.MemcachedClient;
 import org.greencheek.caching.herdcache.memcached.config.Host;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ElastiCacheHost;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
