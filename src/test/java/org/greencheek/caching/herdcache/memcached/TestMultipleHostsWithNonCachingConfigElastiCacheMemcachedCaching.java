@@ -162,7 +162,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         long start = System.currentTimeMillis();
         while(integer.get()>0) {
             long now = System.currentTimeMillis();
-            if((now-start) > 15000) {
+            if((now-start) > 20000) {
                 ok = false;
                 break;
             }
@@ -201,7 +201,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
             cache = new ElastiCacheMemcachedCache<String>(
                     new ElastiCacheCacheConfigBuilder()
                             .setElastiCacheConfigHosts("localhost:" + server.getPort())
-                            .setConfigPollingTime(Duration.ofSeconds(10))
+                            .setConfigPollingTime(Duration.ofSeconds(9))
                             .setInitialConfigPollingDelay(Duration.ofSeconds(0))
                             .setTimeToLive(Duration.ofSeconds(2))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
