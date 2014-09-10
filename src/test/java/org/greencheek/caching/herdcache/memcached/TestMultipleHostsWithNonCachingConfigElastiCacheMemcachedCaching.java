@@ -80,7 +80,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
     private void testStaleCaching(CacheWithExpiry cache) {
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -111,7 +111,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
         ListenableFuture<String> passThrough = cache.apply("Key1", () -> {
             try {
-                Thread.sleep(2500);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -143,8 +143,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         assertEquals("Value should be key1", "New Value", cache.awaitForFutureOrElse(val6, null));
 
 
-        Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(200);
-        for(int i=0;i<200;i++) {
+        Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(100);
+        for(int i=0;i<100;i++) {
             final String uuidKey = UUID.randomUUID().toString();
             cacheWrites.put(uuidKey, cache.apply(uuidKey, () -> {
                 return uuidKey;
@@ -206,6 +206,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
                             .setTimeToLive(Duration.ofSeconds(2))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                             .setWaitForMemcachedSet(true)
+                            .setSetWaitDuration(Duration.ofSeconds(10))
                             .setHashAlgorithm(algo)
                             .setDelayBeforeClientClose(Duration.ofSeconds(1))
                             .setDnsConnectionTimeout(Duration.ofSeconds(2))
