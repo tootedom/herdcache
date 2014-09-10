@@ -4,7 +4,7 @@
 
     <groupId>org.greencheek.caching</groupId>
     <artifactId>herdcache</artifactId>
-    <version>1.0.3-SNAPSHOT</version>
+    <version>1.0.3</version>
     <packaging>jar</packaging>
 
     <name>herdcache</name>
@@ -35,7 +35,7 @@
         <connection>scm:git:git@github.com:tootedom/herdcache.git</connection>
         <url>scm:git:git@github.com:tootedom/herdcache.git</url>
         <developerConnection>scm:git:git@github.com:tootedom/herdcache.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>herdcache-1.0.3</tag>
     </scm>
 
     <properties>
