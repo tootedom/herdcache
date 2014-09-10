@@ -252,7 +252,7 @@ public class TestNoHostsElastiCacheMemcachedCaching {
             cache = new ElastiCacheMemcachedCache<String>(
                     new ElastiCacheCacheConfigBuilder()
                             .setElastiCacheConfigHosts("localhost:" + server.getPort())
-                            .setConfigPollingTime(Duration.ofSeconds(10))
+                            .setConfigPollingTime(Duration.ofSeconds(20))
                             .setInitialConfigPollingDelay(Duration.ofSeconds(0))
                             .setTimeToLive(Duration.ofSeconds(2))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
@@ -284,7 +284,7 @@ public class TestNoHostsElastiCacheMemcachedCaching {
             }
 
             try {
-                Thread.sleep(7000);
+                Thread.sleep(15000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

@@ -1,6 +1,10 @@
 package org.greencheek.caching.herdcache.memcached.config;
 
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
+
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by dominictootell on 24/08/2014.
@@ -17,6 +21,7 @@ public class ElastiCacheCacheConfig {
     private final Duration delayBeforeClientClose;
     private final int numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
     private final boolean updateConfigVersionOnDnsTimeout;
+    private final List<ClientClusterUpdateObserver> clusterUpdatedObservers;
 
     public ElastiCacheCacheConfig(MemcachedCacheConfig memcachedConf,
                                   String elastiCacheConfigHosts,
@@ -27,7 +32,8 @@ public class ElastiCacheCacheConfig {
             Duration reconnectDelay,
             Duration delayBeforeClientClose,
             int numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
-            boolean updateConfigVersionOnDnsTimeout) {
+            boolean updateConfigVersionOnDnsTimeout,
+            List<ClientClusterUpdateObserver> clusterUpdatedObservers) {
         this.memcachedCacheConfig = memcachedConf;
         this.elastiCacheConfigHosts = elastiCacheConfigHosts;
         this.configPollingTime = configPollingTime;
@@ -38,6 +44,9 @@ public class ElastiCacheCacheConfig {
         this.delayBeforeClientClose = delayBeforeClientClose;
         this.numberOfConsecutiveInvalidConfigurationsBeforeReconnect = numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
         this.updateConfigVersionOnDnsTimeout = updateConfigVersionOnDnsTimeout;
+        this.clusterUpdatedObservers = new ArrayList<ClientClusterUpdateObserver>(clusterUpdatedObservers.size());
+
+        this.clusterUpdatedObservers.addAll(clusterUpdatedObservers);
     }
 
     public MemcachedCacheConfig getMemcachedCacheConfig() {
@@ -78,5 +87,9 @@ public class ElastiCacheCacheConfig {
 
     public String getElastiCacheConfigHosts() {
         return elastiCacheConfigHosts;
+    }
+
+    public List<ClientClusterUpdateObserver> getClusterUpdatedObservers() {
+        return this.clusterUpdatedObservers;
     }
 }

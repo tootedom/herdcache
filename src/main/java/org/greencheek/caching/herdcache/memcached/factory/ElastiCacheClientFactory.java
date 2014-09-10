@@ -3,10 +3,7 @@ package org.greencheek.caching.herdcache.memcached.factory;
 import net.spy.memcached.ConnectionFactory;
 import net.spy.memcached.MemcachedClientIF;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
-import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ConfigRetrievalSettings;
-import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ConfigRetrievalSettingsBuilder;
-import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheServerConnectionDetails;
-import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.PeriodicConfigRetrievalClient;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.*;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.confighandler.ConfigInfoProcessor;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.configparsing.DefaultElastiCacheConfigParser;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.configprocessing.ElastiCacheConfigInfoProcessor;
@@ -14,6 +11,7 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection.U
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.connection.UpdateReferencedMemcachedClientService;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -45,7 +43,8 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
                                     Duration dnsLookupTimeout,
                                     boolean updateConfigVersionOnDnsTimeout,
                                     int numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
-                                    Duration connectionTimeout) {
+                                    Duration connectionTimeout,
+                                    List<ClientClusterUpdateObserver> clusterUpdateObservers) {
         this.connnectionFactory = connnectionFactory;
         this.elastiCacheConfigHosts = elastiCacheConfigHosts;
         this.configPollingTime = configPollingTime;
@@ -59,7 +58,8 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
         memcachedClientHolder = new UpdateReferencedMemcachedClientService(dnsLookupService,
                 dnsLookupTimeout, connnectionFactory, delayBeforeClientClose);
 
-        suppliedConfigInfoProcessor = new ElastiCacheConfigInfoProcessor(new DefaultElastiCacheConfigParser(), memcachedClientHolder, updateConfigVersionOnDnsTimeout);
+        suppliedConfigInfoProcessor = new ElastiCacheConfigInfoProcessor(new DefaultElastiCacheConfigParser(),
+                memcachedClientHolder, updateConfigVersionOnDnsTimeout,clusterUpdateObservers);
         ConfigRetrievalSettings elastiCacheConfigPeriodicConfigRetrievalSettings = createConfigRetrievalSettings();
 
         configRetrievalClient = new PeriodicConfigRetrievalClient(elastiCacheConfigPeriodicConfigRetrievalSettings);

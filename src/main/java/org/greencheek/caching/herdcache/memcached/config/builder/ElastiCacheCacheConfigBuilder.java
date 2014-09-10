@@ -3,10 +3,13 @@ package org.greencheek.caching.herdcache.memcached.config.builder;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
 import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
 import org.greencheek.caching.herdcache.memcached.factory.SpyMemcachedClientFactory;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by dominictootell on 24/08/2014.
@@ -22,6 +25,7 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
     private Duration delayBeforeClientClose = Duration.ofSeconds(10);
     private int numberOfConsecutiveInvalidConfigurationsBeforeReconnect = 3;
     private boolean updateConfigVersionOnDnsTimeout = true;
+    private List<ClientClusterUpdateObserver> clusterUpdatedObservers = new ArrayList<>();
 
     public ElastiCacheCacheConfigBuilder setElastiCacheConfigHosts(String urls) {
         this.elastiCacheConfigHosts = urls;
@@ -68,6 +72,10 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
         return self();
     }
 
+    public ElastiCacheCacheConfigBuilder addElastiCacheClientClusterUpdateObserver(ClientClusterUpdateObserver observer) {
+        clusterUpdatedObservers.add(observer);
+        return self();
+    }
 
     @Override
     public ElastiCacheCacheConfig buildElastiCacheMemcachedConfig() {
@@ -80,7 +88,8 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
                 reconnectDelay,
                 delayBeforeClientClose,
                 numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
-                updateConfigVersionOnDnsTimeout
+                updateConfigVersionOnDnsTimeout,
+                clusterUpdatedObservers
         );
 
     }

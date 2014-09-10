@@ -8,6 +8,7 @@ import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.server.StringServer;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
@@ -22,11 +23,13 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -154,6 +157,26 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
     }
 
+    private boolean waitOnInt(AtomicInteger integer) {
+        boolean ok = true;
+        long start = System.currentTimeMillis();
+        while(integer.get()>0) {
+            long now = System.currentTimeMillis();
+            if((now-start) > 15000) {
+                ok = false;
+                break;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        integer.set(1);
+        return ok;
+    }
+
     private void testHashAlgorithm(HashAlgorithm algo) {
 
         String[] configurationsMessage = new String[]{
@@ -161,7 +184,6 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
                 "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
                 "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
                 "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
-                "CONFIG cluster 0 147\r\n" + "f\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
                 "CONFIG cluster 0 147\r\n" + "4\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + "\r\n" + "\nEND\r\n",
 
         };
@@ -169,6 +191,11 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         StringServer server = new StringServer(configurationsMessage, 0, TimeUnit.SECONDS);
         server.before(configurationsMessage, TimeUnit.SECONDS, -1, false);
 
+        final AtomicInteger latch = new AtomicInteger(1);
+
+        ClientClusterUpdateObserver observer = (updated) -> {
+            latch.decrementAndGet();
+        };
 
         try {
             cache = new ElastiCacheMemcachedCache<String>(
@@ -185,15 +212,12 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
                             .setUseStaleCache(true)
                             .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
                             .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
+                            .addElastiCacheClientClusterUpdateObserver(observer)
                             .buildElastiCacheMemcachedConfig()
             );
 
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
 
+            assertTrue(waitOnInt(latch));
 
             testStaleCaching(cache);
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems() >= 1);
@@ -201,15 +225,9 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
-                clearCache(memcached1);
-                clearCache(memcached2);
             }
 
-            try {
-                Thread.sleep(7000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            assertTrue(waitOnInt(latch));
 
             testStaleCaching(cache);
 
@@ -218,15 +236,9 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
-                clearCache(memcached1);
-                clearCache(memcached2);
             }
 
-            try {
-                Thread.sleep(7000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            assertTrue(waitOnInt(latch));
 
             testStaleCaching(cache);
 
@@ -235,15 +247,9 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
-                clearCache(memcached1);
-                clearCache(memcached2);
             }
 
-            try {
-                Thread.sleep(7000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            assertTrue(waitOnInt(latch));
 
             testStaleCaching(cache);
 
@@ -252,16 +258,10 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
-                clearCache(memcached1);
-                clearCache(memcached2);
             }
 
 
-            try {
-                Thread.sleep(7000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            assertTrue(waitOnInt(latch));
 
             testStaleCaching(cache);
 

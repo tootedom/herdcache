@@ -34,7 +34,8 @@ public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
                 mConfig.getDnsConnectionTimeout(),
                 config.isUpdateConfigVersionOnDnsTimeout(),
                 config.getNumberOfConsecutiveInvalidConfigurationsBeforeReconnect(),
-                config.getConnectionTimeoutInMillis()
+                config.getConnectionTimeoutInMillis(),
+                config.getClusterUpdatedObservers()
         ),mConfig);
     }
 
