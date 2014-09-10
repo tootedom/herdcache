@@ -4,8 +4,6 @@ import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
-import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
-import org.greencheek.caching.herdcache.memcached.factory.SpyMemcachedClientFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -22,7 +20,7 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
     private Duration connectionTimeoutInMillis = Duration.ofMillis(3000);
     private Duration idleReadTimeout = Duration.ofSeconds(125);
     private Duration reconnectDelay = Duration.ofSeconds(5);
-    private Duration delayBeforeClientClose = Duration.ofSeconds(10);
+    private Duration delayBeforeClientClose = Duration.ofSeconds(300);
     private int numberOfConsecutiveInvalidConfigurationsBeforeReconnect = 3;
     private boolean updateConfigVersionOnDnsTimeout = true;
     private List<ClientClusterUpdateObserver> clusterUpdatedObservers = new ArrayList<>();

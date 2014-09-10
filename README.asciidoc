@@ -379,6 +379,8 @@ The following show various ways of configuring the cache:
 The `ElastiCacheCacheConfigBuilder` extends the abstract class `MemcachedCacheConfigBuilder` which contains the defaults
 for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to override the defaults:
 
+The following defaults are for both memcached and ElastiCache memcached
+
 [width="25%",options="header"]
 |=========================================================
 |Method         |Default | Description |
@@ -408,6 +410,21 @@ for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to ov
 |removeFutureFromInternalCacheBeforeSettingValue | false; | When the `Supplier<V>` computation is completed the future is set with the computed value, and removed
 from the internal cache.  This is whether (false) set the future to complete, before removal for internal future cache.  Or (true), remove the future from
 map firts and then set the future value |
+|=========================================================
+
+The following default apply just to that of ElastiCache memcached
+
+|=========================================================
+|Method         |Default | Description |
+| setElastiCacheConfigHosts | "localhost:11211"; | The memcached elasticache config host name i.e. yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211 |
+| setConfigPollingTime  | Duration.ofSeconds(60); | The frequency by which to contact the config host for potential updates to the memcached nodes |
+| setInitialConfigPollingDelay | Duration.ZERO; | The time for the initial poll to the config host to obtain the memcached nodes|
+| setConnectionTimeoutInMillis | Duration.ofMillis(3000); | The time for establishing a connection to the config host before stopping and retrying |
+| setIdleReadTimeout | Duration.ofSeconds(125); |  If the client does also receive any data from the ElastiCache Configuration Endpoint, a reconnection will be made; this idle period is controlled by the setting idleReadTimeout. |
+| setReconnectDelay | Duration.ofSeconds(5); | The delay between performing a reconnection attempt to the config host |
+| setDelayBeforeClientClose | Duration.ofSeconds(300); | When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created, and the old client is closed. There a delay before the old client is closed, as it may still be in use |
+| setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect | 3 | If the config host returns invalid config this number of times in a row, a reconnection will be made |
+| setUpdateConfigVersionOnDnsTimeout | true; |  Set to false, if you don't want to acknowledge a config update, if a dns resolution for any of the memcached nodes failed |
 |=========================================================
 
 '''
