@@ -38,7 +38,7 @@ The below details how to use the caching implementations, the differences betwee
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.3</version>
 </dependency>
 ----
 
@@ -306,6 +306,63 @@ Duration parameter.  Meaning that keys can have differing cache expiry times (me
 
 '''
 
+=== Defaults
+
+Both the following cache classes use the following defaults.
+
+The `ElastiCacheCacheConfigBuilder` extends the abstract class `MemcachedCacheConfigBuilder` which contains the defaults
+for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to override the defaults:
+
+The following defaults are for both memcached and ElastiCache memcached
+
+[width="25%",options="header"]
+|=========================================================
+|Method         |Default | Description |
+|setTimeToLive     |  Duration.ofSeconds(60); | The default expiry time an item with be given if not specified |
+|setMaxCapacity    | 1000; | Max number of futures to internal cache whilst a value is being calculated |
+|setMemcachedHosts | "localhost:11211"; | Comma separated host list |
+|setHashingType    | ConnectionFactoryBuilder.Locator.CONSISTENT; | Using consistent hashing, don't change |
+|setFailureMode    | FailureMode.Redistribute; | When an error occurs, what should occur (FailureMode.Retry may suit you better for this) |
+|setHashAlgorithm  | DefaultHashAlgorithm.KETAMA_HASH; | Type of consistent hashing to be used for calculating the memcached node to talk to, don't change |
+|serializingTranscoder | new FastSerializingTranscoder(); | The type of serializer to be used.  Class responsbile for serialising java objects to a byte stream to store in memcached |
+|protocol | ConnectionFactoryBuilder.Protocol.BINARY; | the protocol used for talking to memcached |
+|readBufferSize | DefaultConnectionFactory.DEFAULT_READ_BUFFER_SIZE; | default socket buffer size when talking to memcached, do not change|
+|memcachedGetTimeout  | Duration.ofMillis(2500); | when looking in memcached for a matching key, this is the amount of time to wait before timing out |
+|dnsConnectionTimeout | Duration.ofSeconds(3); | When resolving the memcachedHosts to ip addresses, the amount of time to wait for dns lookup, before ignoring that node |
+|waitForMemcachedSet  | false | Wait for the write to memcached to occur before removing future from internal cache |
+|setWaitDuration | Duration.ofSeconds(2); | amount of time to wait for the memcached set |
+|keyHashType | KeyHashingType.JAVA_XXHASH; | how the cache key is hashed |
+|keyPrefix | Optional.empty() | should the key used in lookup, be prefixed with a string to avoid the unlikely event of a key claash. |
+|asciiOnlyKeys | false; | we only have ascii keys that will be stored in the cache |
+|hostStringParser | new CommaSeparatedHostAndPortStringParser(); | do not change |
+|hostResolver | new AddressByNameHostResolver(); | do not change|
+|useStaleCache | false; | whether stale caching is enabled |
+|staleCacheAdditionalTimeToLive | Duration.ZERO; | The amount of time extra that items will be stored in the stale cached |
+|staleCachePrefix | "stale"; | The prefix for stale keys, to avoid clash |
+|staleMaxCapacity | -1; | The size of the cache for futures for the stae cache is the same as the `maxCapacity` if -1 |
+|staleCacheMemachedGetTimeout | Duration.ZERO | Time to wait for lookups against the stale cache |
+|removeFutureFromInternalCacheBeforeSettingValue | false; | When the `Supplier<V>` computation is completed the future is set with the computed value, and removed
+from the internal cache.  This is whether (false) set the future to complete, before removal for internal future cache.  Or (true), remove the future from
+map firts and then set the future value |
+|=========================================================
+
+The following default apply just to that of ElastiCache memcached
+
+|=========================================================
+|Method         |Default | Description |
+| setElastiCacheConfigHosts | "localhost:11211"; | The memcached elasticache config host name i.e. yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211 |
+| setConfigPollingTime  | Duration.ofSeconds(60); | The frequency by which to contact the config host for potential updates to the memcached nodes |
+| setInitialConfigPollingDelay | Duration.ZERO; | The time for the initial poll to the config host to obtain the memcached nodes|
+| setConnectionTimeoutInMillis | Duration.ofMillis(3000); | The time for establishing a connection to the config host before stopping and retrying |
+| setIdleReadTimeout | Duration.ofSeconds(125); |  If the client does also receive any data from the ElastiCache Configuration Endpoint, a reconnection will be made; this idle period is controlled by the setting idleReadTimeout. |
+| setReconnectDelay | Duration.ofSeconds(5); | The delay between performing a reconnection attempt to the config host |
+| setDelayBeforeClientClose | Duration.ofSeconds(300); | When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created, and the old client is closed. There a delay before the old client is closed, as it may still be in use |
+| setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect | 3 | If the config host returns invalid config this number of times in a row, a reconnection will be made |
+| setUpdateConfigVersionOnDnsTimeout | true; |  Set to false, if you don't want to acknowledge a config update, if a dns resolution for any of the memcached nodes failed |
+|=========================================================
+
+'''
+
 === `SpyMemcachedCache`
 
 
@@ -373,61 +430,6 @@ The following show various ways of configuring the cache:
         assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val null));
 ----
 
-
-==== Defaults
-
-The `ElastiCacheCacheConfigBuilder` extends the abstract class `MemcachedCacheConfigBuilder` which contains the defaults
-for which the `SpyMemcachedCache<V>` will execute.  The builder allows you to override the defaults:
-
-The following defaults are for both memcached and ElastiCache memcached
-
-[width="25%",options="header"]
-|=========================================================
-|Method         |Default | Description |
-|setTimeToLive     |  Duration.ofSeconds(60); | The default expiry time an item with be given if not specified |
-|setMaxCapacity    | 1000; | Max number of futures to internal cache whilst a value is being calculated |
-|setMemcachedHosts | "localhost:11211"; | Comma separated host list |
-|setHashingType    | ConnectionFactoryBuilder.Locator.CONSISTENT; | Using consistent hashing, don't change |
-|setFailureMode    | FailureMode.Redistribute; | When an error occurs, what should occur (FailureMode.Retry may suit you better for this) |
-|setHashAlgorithm  | DefaultHashAlgorithm.KETAMA_HASH; | Type of consistent hashing to be used for calculating the memcached node to talk to, don't change |
-|serializingTranscoder | new FastSerializingTranscoder(); | The type of serializer to be used.  Class responsbile for serialising java objects to a byte stream to store in memcached |
-|protocol | ConnectionFactoryBuilder.Protocol.BINARY; | the protocol used for talking to memcached |
-|readBufferSize | DefaultConnectionFactory.DEFAULT_READ_BUFFER_SIZE; | default socket buffer size when talking to memcached, do not change|
-|memcachedGetTimeout  | Duration.ofMillis(2500); | when looking in memcached for a matching key, this is the amount of time to wait before timing out |
-|dnsConnectionTimeout | Duration.ofSeconds(3); | When resolving the memcachedHosts to ip addresses, the amount of time to wait for dns lookup, before ignoring that node |
-|waitForMemcachedSet  | false | Wait for the write to memcached to occur before removing future from internal cache |
-|setWaitDuration | Duration.ofSeconds(2); | amount of time to wait for the memcached set |
-|keyHashType | KeyHashingType.JAVA_XXHASH; | how the cache key is hashed |
-|keyPrefix | Optional.empty() | should the key used in lookup, be prefixed with a string to avoid the unlikely event of a key claash. |
-|asciiOnlyKeys | false; | we only have ascii keys that will be stored in the cache |
-|hostStringParser | new CommaSeparatedHostAndPortStringParser(); | do not change |
-|hostResolver | new AddressByNameHostResolver(); | do not change|
-|useStaleCache | false; | whether stale caching is enabled |
-|staleCacheAdditionalTimeToLive | Duration.ZERO; | The amount of time extra that items will be stored in the stale cached |
-|staleCachePrefix | "stale"; | The prefix for stale keys, to avoid clash |
-|staleMaxCapacity | -1; | The size of the cache for futures for the stae cache is the same as the `maxCapacity` if -1 |
-|staleCacheMemachedGetTimeout | Duration.ZERO | Time to wait for lookups against the stale cache |
-|removeFutureFromInternalCacheBeforeSettingValue | false; | When the `Supplier<V>` computation is completed the future is set with the computed value, and removed
-from the internal cache.  This is whether (false) set the future to complete, before removal for internal future cache.  Or (true), remove the future from
-map firts and then set the future value |
-|=========================================================
-
-The following default apply just to that of ElastiCache memcached
-
-|=========================================================
-|Method         |Default | Description |
-| setElastiCacheConfigHosts | "localhost:11211"; | The memcached elasticache config host name i.e. yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211 |
-| setConfigPollingTime  | Duration.ofSeconds(60); | The frequency by which to contact the config host for potential updates to the memcached nodes |
-| setInitialConfigPollingDelay | Duration.ZERO; | The time for the initial poll to the config host to obtain the memcached nodes|
-| setConnectionTimeoutInMillis | Duration.ofMillis(3000); | The time for establishing a connection to the config host before stopping and retrying |
-| setIdleReadTimeout | Duration.ofSeconds(125); |  If the client does also receive any data from the ElastiCache Configuration Endpoint, a reconnection will be made; this idle period is controlled by the setting idleReadTimeout. |
-| setReconnectDelay | Duration.ofSeconds(5); | The delay between performing a reconnection attempt to the config host |
-| setDelayBeforeClientClose | Duration.ofSeconds(300); | When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created, and the old client is closed. There a delay before the old client is closed, as it may still be in use |
-| setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect | 3 | If the config host returns invalid config this number of times in a row, a reconnection will be made |
-| setUpdateConfigVersionOnDnsTimeout | true; |  Set to false, if you don't want to acknowledge a config update, if a dns resolution for any of the memcached nodes failed |
-|=========================================================
-
-'''
 
 ==== Specifying the Memcached hosts
 
