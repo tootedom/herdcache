@@ -60,7 +60,6 @@ import java.util.function.Supplier;
     private final long staleCacheMemachedGetTimeoutInMillis;
     private final long waitForSetDurationInMillis;
 
-
     private final CacheValueComputationFailureHandler failureHandler;
 
 
@@ -110,7 +109,6 @@ import java.util.function.Supplier;
         waitForSetDurationInMillis = config.getSetWaitDuration().toMillis();
 
         failureHandler = (String key, Throwable t) -> { store.remove(key); };
-
     }
 
     private boolean isEnabled() {
@@ -426,12 +424,16 @@ import java.util.function.Supplier;
                     @Override
                     public void onSuccess(V result) {
                         try {
-                            if (config.isUseStaleCache()) {
-                                // overwrite the stale cache entry
-                                writeToDistributedCache(client,staleCacheKey, result, staleItemExpiry, false);
+                            if(result!=null) {
+                                if (config.isUseStaleCache()) {
+                                    // overwrite the stale cache entry
+                                    writeToDistributedCache(client, staleCacheKey, result, staleItemExpiry, false);
+                                }
+                                // write the cache entry
+                                writeToDistributedCache(client, key, result, itemExpiry, config.isWaitForMemcachedSet());
+                            } else {
+                                logger.debug("Cache Value computation was null, not storing in memcached");
                             }
-                            // write the cache entry
-                            writeToDistributedCache(client,key, result, itemExpiry, config.isWaitForMemcachedSet());
 
                         } catch (Exception e) {
                             logger.error("problem setting key {} in memcached", key);
