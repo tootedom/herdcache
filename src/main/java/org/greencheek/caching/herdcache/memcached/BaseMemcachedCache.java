@@ -86,7 +86,7 @@ import java.util.function.Supplier;
         }
 
         Duration staleDuration = config.getStaleCacheAdditionalTimeToLive();
-        if(staleDuration==Duration.ZERO) {
+        if(staleDuration.compareTo(Duration.ZERO)<=0) {
             staleCacheAdditionalTimeToLiveValue = config.getTimeToLive();
         } else {
             staleCacheAdditionalTimeToLiveValue = staleDuration;
@@ -100,7 +100,7 @@ import java.util.function.Supplier;
 
 
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
-        if(config.getStaleCacheMemachedGetTimeout() == Duration.ZERO) {
+        if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
             staleCacheMemachedGetTimeoutInMillis = memcachedGetTimeoutInMillis;
         } else {
             staleCacheMemachedGetTimeoutInMillis = config.getStaleCacheMemachedGetTimeout().toMillis();
@@ -191,7 +191,7 @@ import java.util.function.Supplier;
             try {
                 client.getClient().set(key, entryTTLInSeconds, value);
             } catch (Exception e) {
-                logger.warn("Exception waiting for memcached set to occur");
+                logger.warn("Exception waiting for memcached set to occur",e);
             }
         }
     }
@@ -436,7 +436,7 @@ import java.util.function.Supplier;
                             }
 
                         } catch (Exception e) {
-                            logger.error("problem setting key {} in memcached", key);
+                            logger.error("problem setting key {} in memcached", key,e);
                         } finally {
                             if (config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
                                 store.remove(key, promise);
