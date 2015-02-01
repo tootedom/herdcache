@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -37,7 +39,6 @@ import java.util.function.Supplier;
                 config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType());
     }
 
-
     public static final String CACHE_TYPE_VALUE_CALCULATION = "value_calculation_cache";
     public static final String CACHE_TYPE_CACHE_DISABLED = "disabled_cache";
     public static final String CACHE_TYPE_STALE_CACHE = "stale_distributed_cache";
@@ -46,6 +47,7 @@ import java.util.function.Supplier;
     private static final Logger logger  = LoggerFactory.getLogger(BaseMemcachedCache.class);
     private static final Logger cacheHitMissLogger   = LoggerFactory.getLogger("MemcachedCacheHitsLogger");
 
+    private static final Consumer DO_NOTHING_CONSUMER = (result) -> {};
 
     private final MemcachedCacheConfig config;
     private final KeyHashing keyHashingFunction;
@@ -203,7 +205,8 @@ import java.util.function.Supplier;
             logCacheMiss(key,CACHE_TYPE_CACHE_DISABLED);
             ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
             Futures.addCallback(computationFuture,
-                    new CacheRequestFutureComputationCompleteNotifier<V>(key, toBeComputedFuture, failureHandler));
+                    new CacheRequestFutureComputationCompleteNotifier<V>(key, toBeComputedFuture, failureHandler,DO_NOTHING_CONSUMER));
+
             Futures.addCallback(computationFuture,
                     new FutureCallback<V>() {
                         @Override
@@ -227,11 +230,6 @@ import java.util.function.Supplier;
         return ec.submit(() -> getFromDistributedCache(client,key));
     }
 
-
-    @Override
-    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService) {
-        return apply(key,computation,config.getTimeToLive(),executorService);
-    }
 
     @Override
     public ListenableFuture<V> get(String key, ListeningExecutorService executorService) {
@@ -263,11 +261,34 @@ import java.util.function.Supplier;
         }
     }
 
+
+
+    @Override
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService) {
+        return apply(key,computation,config.getTimeToLive(),executorService);
+    }
+
+    @Override
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor) {
+        return apply(key,computation,config.getTimeToLive(),executorService,canCacheValueEvalutor);
+    }
+
+
     @Override
     public ListenableFuture<V> apply(String key,
                                      Supplier<V> computation,
                                      Duration timeToLive,
                                      ListeningExecutorService executorService) {
+          return apply(key,computation,timeToLive,executorService,CAN_ALWAYS_CACHE_VALUE);
+    }
+
+    @Override
+    public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     Duration timeToLive,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor) {
 
         String keyString = getHashedKey(key);
 
@@ -299,7 +320,8 @@ import java.util.function.Supplier;
                     logger.debug("set requested for {}", keyString);
                     return cacheWriteFunction(client,computation, promise,
                             keyString, staleCacheKey,
-                            timeToLive,staleCacheExpiry,executorService);
+                            timeToLive,staleCacheExpiry,executorService,
+                            canCacheValueEvalutor);
                 }
                 else {
                     if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
@@ -416,7 +438,8 @@ import java.util.function.Supplier;
                                                    final String key, String staleCacheKey,
                                                    Duration itemExpiry,
                                                    Duration staleItemExpiry,
-                                                   ListeningExecutorService executorService) {
+                                                   ListeningExecutorService executorService,
+                                                   Predicate<V> canCacheValue) {
 
         ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
         Futures.addCallback(computationFuture,
@@ -424,7 +447,7 @@ import java.util.function.Supplier;
                     @Override
                     public void onSuccess(V result) {
                         try {
-                            if(result!=null) {
+                            if(result!=null && canCacheValue.test(result)) {
                                 if (config.isUseStaleCache()) {
                                     // overwrite the stale cache entry
                                     writeToDistributedCache(client, staleCacheKey, result, staleItemExpiry, false);

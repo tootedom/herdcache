@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 import java.time.Duration;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -11,5 +12,7 @@ import java.util.function.Supplier;
  */
 public interface CacheWithExpiry<V> extends Cache<V> {
     public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService);
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive,
+                                     ListeningExecutorService executorService, Predicate<V> canCacheValueEvalutor);
 
 }

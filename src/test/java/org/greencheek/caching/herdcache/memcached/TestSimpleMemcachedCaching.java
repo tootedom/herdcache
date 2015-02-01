@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -480,7 +481,7 @@ public class TestSimpleMemcachedCaching {
             "\n" +
             "There is really no real difference between the SimpleLruCache (https://github.com/spray/spray/blob/v1.2.1/spray-caching/src/main/scala/spray/caching/LruCache.scala#L54)\n" +
             "and the memcached library implementation.\n" +
-            "\n"+ UUID.randomUUID().toString();
+            "\n" + UUID.randomUUID().toString();
 
     private MemcachedDaemonWrapper memcached;
     private ListeningExecutorService executorService;
@@ -492,7 +493,7 @@ public class TestSimpleMemcachedCaching {
 
         memcached = MemcachedDaemonFactory.createMemcachedDaemon(false);
 
-        if(memcached.getDaemon()==null) {
+        if (memcached.getDaemon() == null) {
             throw new RuntimeException("Unable to start local memcached");
         }
 
@@ -501,11 +502,11 @@ public class TestSimpleMemcachedCaching {
 
     @After
     public void tearDown() {
-        if(memcached!=null) {
+        if (memcached != null) {
             memcached.getDaemon().stop();
         }
 
-        if(cache!=null && cache instanceof RequiresShutdown) {
+        if (cache != null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
     }
@@ -541,8 +542,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -595,8 +596,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -633,8 +634,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -676,8 +677,8 @@ public class TestSimpleMemcachedCaching {
         }, Duration.ofSeconds(1), executorService);
 
 
-        assertEquals("Value should be key1","value1", cache.awaitForFutureOrElse(val1_again, null));
-        assertEquals("Value should be key2","value2_again",cache.awaitForFutureOrElse(val2_again, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val1_again, null));
+        assertEquals("Value should be key2", "value2_again", cache.awaitForFutureOrElse(val2_again, null));
 
         assertEquals(2, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -715,8 +716,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -754,8 +755,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
     }
@@ -794,8 +795,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
     }
@@ -831,14 +832,73 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
     }
 
+    @Test
+    public void testCachePredicate() {
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.MD5_UPPER)
+                        .buildMemcachedConfig()
+        );
 
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService, (value) -> {
+            return !value.equals("value1");
+        });
+
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        }, executorService);
+
+
+        assertEquals("Value for key1 should be value1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value for key1 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+
+        ListenableFuture<String> val3 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value3";
+        }, executorService);
+
+        assertEquals("Value for key1 should be value2", "value2", cache.awaitForFutureOrElse(val3, null));
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+    }
 
     @Test
     public void testMD5UpperKeyHashingMemcachedCache() {
@@ -871,39 +931,38 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
     }
 
-    public static class Document implements Serializable{
+    public static class Document implements Serializable {
         static final long serialVersionUID = 42L;
 
         private final String title;
         private final String author;
         private final String content;
 
-        public Document(String title,String author, String content) {
+        public Document(String title, String author, String content) {
             this.title = title;
             this.author = author;
             this.content = content;
         }
 
         public boolean equals(Object o) {
-            if(o instanceof Document) {
-                Document other = (Document)o;
+            if (o instanceof Document) {
+                Document other = (Document) o;
 
-                if(other.title.equals(this.title) &&
+                if (other.title.equals(this.title) &&
                         other.author.equals(this.author) &&
                         other.content.equals(this.content)) {
                     return true;
                 } else {
                     return false;
                 }
-            }
-            else {
+            } else {
                 return false;
             }
         }
@@ -922,8 +981,8 @@ public class TestSimpleMemcachedCaching {
                         .buildMemcachedConfig()
         );
 
-        Document nemo = new Document("Finding Nemo","Disney",largeCacheValue);
-        Document jungle = new Document("Jungle Book","Disney",largeCacheValue);
+        Document nemo = new Document("Finding Nemo", "Disney", largeCacheValue);
+        Document jungle = new Document("Jungle Book", "Disney", largeCacheValue);
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
                 Thread.sleep(1000);
@@ -943,8 +1002,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1",nemo,cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1",nemo,cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", nemo, cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", nemo, cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -963,8 +1022,8 @@ public class TestSimpleMemcachedCaching {
                         .buildMemcachedConfig()
         );
 
-        Document nemo = new Document("Finding Nemo","Disney",largeCacheValue);
-        Document jungle = new Document("Jungle Book","Disney",largeCacheValue);
+        Document nemo = new Document("Finding Nemo", "Disney", largeCacheValue);
+        Document jungle = new Document("Jungle Book", "Disney", largeCacheValue);
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
                 Thread.sleep(1000);
@@ -984,10 +1043,10 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be nemo object",nemo,cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be nemo object",nemo,cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(val2, null));
 
-        assertEquals("Value should be nemo object",nemo,cache.awaitForFutureOrElse(cache.get("Key1"), null));
+        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(cache.get("Key1"), null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -1014,7 +1073,7 @@ public class TestSimpleMemcachedCaching {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            return largeCacheValueAsBytes ;
+            return largeCacheValueAsBytes;
         }, executorService);
 
         ListenableFuture<String> val2 = cache.apply("Key1", () -> {
@@ -1027,8 +1086,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1",largeCacheValueAsBytes,cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1",largeCacheValueAsBytes,cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -1037,7 +1096,6 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testLargeCacheValue() {
-
 
 
         cache = new SpyMemcachedCache<>(
@@ -1056,7 +1114,7 @@ public class TestSimpleMemcachedCaching {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            return largeCacheValue ;
+            return largeCacheValue;
         }, executorService);
 
         ListenableFuture<String> val2 = cache.apply("Key1", () -> {
@@ -1069,8 +1127,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1",largeCacheValue,cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1",largeCacheValue,cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", largeCacheValue, cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", largeCacheValue, cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -1107,8 +1165,8 @@ public class TestSimpleMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 

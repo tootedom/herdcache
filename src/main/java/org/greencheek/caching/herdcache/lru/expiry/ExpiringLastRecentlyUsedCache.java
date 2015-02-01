@@ -5,9 +5,11 @@ import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
 
 import java.sql.Time;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 
@@ -20,7 +22,6 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
     private final TimedEntryType timedEntryType;
 
     private final CacheValueAndEntryComputationFailureHandler failureHandler;
-
 
 
     public ExpiringLastRecentlyUsedCache(int maxCapacity,
@@ -50,18 +51,22 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
         failureHandler = (String key,TimedEntry entry, Throwable t) -> { store.remove(key,entry); };
     }
 
+    public int size() {
+        return store.size();
+    }
+
 
     @Override
-    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService) {
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService, Predicate<V> canCacheValueEvalutor) {
         TimedEntry<V> value = store.get(key);
         if(value==null) {
-            return insertTimedEntry(key,computation,executorService);
+            return insertTimedEntry(key,computation,executorService,canCacheValueEvalutor);
         } else {
             if(value.hasNotExpired(expiryTimes)) {
                 value.touch();
                 return value.getFuture();
             } else {
-                return insertTimedEntry(key,computation,executorService);
+                return insertTimedEntry(key,computation,executorService,canCacheValueEvalutor);
             }
         }
     }
@@ -94,11 +99,20 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
         return entry;
     }
 
-    private ListenableFuture<V>  insertTimedEntry(String key, Supplier<V> computation, ListeningExecutorService executorService) {
+    private ListenableFuture<V>  insertTimedEntry(String key, Supplier<V> computation,
+                                                  ListeningExecutorService executorService,
+                                                  Predicate<V> canCacheValueEvalutor) {
         SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
         TimedEntry<V> newEntry = createTimedEntry(toBeComputedFuture);
 
-        FutureCallback<V> callback = new CacheEntryRequestFutureComputationCompleteNotifier<V>(key,newEntry, toBeComputedFuture, failureHandler);
+        FutureCallback<V> callback = new CacheEntryRequestFutureComputationCompleteNotifier<V>(key,newEntry, toBeComputedFuture, failureHandler,
+                (result) -> {
+                    if(!canCacheValueEvalutor.test(result)) {
+                        store.remove(key,newEntry);
+                    }
+                });
+
+
 
         TimedEntry<V> previousTimedEntry = store.put(key, newEntry);
         if(previousTimedEntry==null) {
@@ -117,6 +131,8 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
             }
             return newEntry.getFuture();
         }
+
+
     }
 
 

@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
@@ -85,6 +86,62 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
 
 
 
+    }
+
+    @Test
+    public void testPredicateStopCaching() {
+        AtomicInteger count = new AtomicInteger(0);
+        ExpiringLastRecentlyUsedCache cache = new ExpiringLastRecentlyUsedCache<>(1000,1000,10000,1000, TimeUnit.MILLISECONDS);
+
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            count.incrementAndGet();
+            return "value1";
+        }, executorService, (cacheValue) -> !cacheValue.equals("value1"));
+
+        assertEquals("Value should be value1 but not cached", "value1", this.awaitForFutureOrElse(val, null));
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals("Nothing should be in the cache", 0, cache.size());
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                count.incrementAndGet();
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                return "key1";
+            }
+
+        }, executorService);
+
+        ListenableFuture<String> val3 = cache.apply("Key1", () -> {
+            try {
+                count.incrementAndGet();
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                return "key1";
+            }
+
+        }, executorService);
+
+
+        assertEquals("One item should be in the cache",1,cache.size());
+
+        assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val2, null));
+
+        assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val3, null));
+
+
+        assertEquals("Value should only have been calculated twice",2,count.get());
     }
 
     @Test

@@ -6,6 +6,7 @@ import org.greencheek.caching.herdcache.Cache;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 
@@ -32,18 +33,21 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
     }
 
     @Override
-    public ListenableFuture<V> apply(final String key, Supplier<V> computation, ListeningExecutorService executorService) {
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService, Predicate<V> canCacheValueEvalutor) {
         SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {
             ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
             Futures.addCallback(computationFuture,
-                    new CacheRequestFutureComputationCompleteNotifier<V>(key,toBeComputedFuture,failureHandler));
+                    new CacheRequestFutureComputationCompleteNotifier<V>(key,toBeComputedFuture,failureHandler,(result) -> {
+                        if(!canCacheValueEvalutor.test(result)) {
+                            store.remove(key,toBeComputedFuture);
+                        }
+                    }));
             return toBeComputedFuture;
         } else {
             return previousFuture;
         }
-
     }
 
     @Override
@@ -54,5 +58,13 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
         } else {
             return future;
         }
+    }
+
+    /**
+     * returns the size of the cache
+     * @return
+     */
+    public int size() {
+        return store.size();
     }
 }
