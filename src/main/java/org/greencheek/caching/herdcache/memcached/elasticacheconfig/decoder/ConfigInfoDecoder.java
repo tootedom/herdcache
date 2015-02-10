@@ -3,6 +3,7 @@ package org.greencheek.caching.herdcache.memcached.elasticacheconfig.decoder;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
+import io.netty.util.ReferenceCountUtil;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ClusterConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,12 +156,18 @@ public class ConfigInfoDecoder extends ReplayingDecoder<ConfigInfoDecodingState>
 
 
     private ByteBuf readLine(int eol,ByteBuf buffer) {
-        final ByteBuf frame;
-        final int length = eol - buffer.readerIndex();
-        final int delimLength = buffer.getByte(eol) == '\r'? 2 : 1;
-        frame = buffer.readSlice(length);
-        buffer.skipBytes(delimLength);
-        return frame.retain();
+        ByteBuf frame = null;
+        try {
+            final int length = eol - buffer.readerIndex();
+            final int delimLength = buffer.getByte(eol) == '\r' ? 2 : 1;
+            frame = buffer.readSlice(length);
+            buffer.skipBytes(delimLength);
+            return frame.retain();
+        } finally {
+            if(frame!=null) {
+                ReferenceCountUtil.release(frame);
+            }
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import net.spy.memcached.ConnectionFactoryBuilder;
+import net.spy.memcached.FailureMode;
 import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 /**
@@ -101,6 +103,73 @@ public class TestSimpleGetMemcachedCaching {
 
             assertNull("Value should be null",cache.awaitForFutureOrElse(val5, "one"));
             assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
+
+    }
+
+    @Test
+    public void testApplyReturnsFromKilledMemcachedCache() {
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(2))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setFailureMode(FailureMode.Cancel)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService);
+
+        ListenableFuture<String> val2 = cache.get("Key1", executorService);
+        ListenableFuture<String> val3 = cache.get("Key1", executorService);
+        ListenableFuture<String> val4 = cache.get("Key1", executorService);
+
+
+        assertEquals("Value should be value1","value1",cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be value1","value1",cache.awaitForFutureOrElse(val2, null));
+        assertEquals("Value should be value1","value1",cache.awaitForFutureOrElse(val3, null));
+        assertEquals("Value should be value1","value1",cache.awaitForFutureOrElse(val4, null));
+
+        ListenableFuture<String> val5 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService);
+
+
+
+
+        if(memcached!=null) {
+            memcached.getDaemon().stop();
+        }
+
+        try {
+            Thread.sleep(5000);
+
+            ListenableFuture<String> val6 = cache.apply("Key1", () -> {
+                return "memcacheddead";
+            }, executorService);
+
+
+            assertNotNull("Value should be null", cache.awaitForFutureOrElse(val6, "one"));
+            assertEquals("Value should be memcacheddead", "memcacheddead",cache.awaitForFutureOrElse(val6, "one"));
+            assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

@@ -291,7 +291,7 @@
                     Sets the VM argument line used when unit tests are run.
                     Set by jacoco
                      -->
-                    <argLine>${surefireArgLine}</argLine>
+                    <argLine>${surefireArgLine} -Dio.netty.leakDetectionLevel=paranoid</argLine>
                     <!-- Skips unit tests if the value of skip.unit.tests property is true -->
                     <skipTests>${skip.unit.tests}</skipTests>
                     <!-- Excludes integration tests when unit tests are run. -->
