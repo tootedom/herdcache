@@ -416,7 +416,13 @@ import java.util.function.Supplier;
                     });
 
         } else {
-            promise.set((V) item);
+            if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
+                staleStore.remove(key,promise);
+                promise.set((V)item);
+            } else {
+                promise.set((V)item);
+                staleStore.remove(key, promise);
+            }
         }
 
     }
@@ -583,6 +589,45 @@ import java.util.function.Supplier;
                 }
             }
         }
+    }
 
+
+    private void waitForDelete(Future<Boolean> future,long millisToWait,
+                               String key,String cacheBeingCleared
+                ) {
+        try {
+            if (millisToWait > 0) {
+                future.get(millisToWait, TimeUnit.MICROSECONDS);
+            } else {
+                future.get();
+            }
+        } catch (InterruptedException e) {
+            logger.warn("Interrupted whilst waiting for {} clear({}) to occur",cacheBeingCleared, key, e);
+        } catch (ExecutionException e) {
+            logger.warn("Exception whilst waiting for {} clear({}) to occur",cacheBeingCleared, key, e);
+        } catch (TimeoutException e) {
+            logger.warn("Timeout whilst waiting for {} clear({}) to occur",cacheBeingCleared, key, e);
+        }
+    }
+    /**
+     * removes/deletes a given key from memcached.  Waiting for the remove if
+     * config.getWaitForRemove is greater than zero
+     * @param key
+     */
+    @Override
+    public void clear(String key) {
+        ReferencedClient client = clientFactory.getClient();
+        if(client.isAvailable()) {
+            MemcachedClientIF cli = client.getClient();
+            if(client!=null) {
+                long millisToWait = config.getWaitForRemove().toMillis();
+                if(config.isUseStaleCache()) {
+                    Future<Boolean> staleCacheFuture = cli.delete(createStaleCacheKey(key));
+                    waitForDelete(staleCacheFuture, millisToWait, key, "stale cache");
+                }
+                Future<Boolean> future = cli.delete(key);
+                waitForDelete(future, millisToWait, key, "cache");
+            }
+        }
     }
 }

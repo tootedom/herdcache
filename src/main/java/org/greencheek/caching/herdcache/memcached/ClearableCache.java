@@ -1,9 +1,15 @@
 package org.greencheek.caching.herdcache.memcached;
 
 /**
- * Created by dominictootell on 31/08/2014.
+ *
  */
-public interface ClearableCache {
+public interface ClearableCache<V> {
     public void clear(boolean waitForClear);
     public void clear();
+
+    /**
+     * Removes a specify key from the cache
+     * @param key
+     */
+    public void clear(String key);
 }

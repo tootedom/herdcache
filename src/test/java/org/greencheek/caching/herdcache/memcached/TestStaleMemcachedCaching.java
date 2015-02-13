@@ -159,6 +159,278 @@ public class TestStaleMemcachedCaching {
     }
 
     @Test
+    public void testStaleMemcachedCacheWithRemove() throws InterruptedException {
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(1))
+                        .setUseStaleCache(true)
+                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.NONE)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will be stalelkjlkjlkjlk";
+        }, executorService);
+
+        assertEquals("Value should be key1", "will be stalelkjlkjlkjlk", cache.awaitForFutureOrElse(val, null));
+
+        Thread.sleep(2000);
+
+        ListenableFuture<String> val_again = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate";
+        }, executorService);
+
+        ListenableFuture<String> val_again2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate over and over";
+        }, executorService);
+
+
+        assertEquals("Value should be key1", "will not generate", cache.awaitForFutureOrElse(val_again, null));
+        assertEquals("Value should be key1", "will be stalelkjlkjlkjlk", cache.awaitForFutureOrElse(val_again2, null));
+
+        Thread.sleep(10000);
+
+
+        ListenableFuture<String> val_again3 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate over and over";
+        }, executorService);
+
+
+        assertEquals("Value should be key1", "will not generate over and over", cache.awaitForFutureOrElse(val_again3, null));
+        Thread.sleep(3000);
+
+        ListenableFuture<String> a = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will generate new val";
+        }, executorService);
+
+        assertEquals("Value should be key1", "will generate new val", cache.awaitForFutureOrElse(a, null));
+
+        Thread.sleep(2000);
+
+        ListenableFuture<String> b = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will generate this value";
+        }, executorService);
+
+
+
+        ListenableFuture<String> c = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate this value";
+        }, executorService);
+
+        Thread.sleep(300);
+
+
+        ((ClearableCache)cache).clear("Key1");
+
+        ListenableFuture<String> d = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "newkey";
+        }, executorService);
+
+
+
+        assertEquals("Value should be key1", "will generate this value", cache.awaitForFutureOrElse(b, null));
+        assertEquals("Value should be key1", "will generate new val", cache.awaitForFutureOrElse(c, null));
+        assertEquals("Value should be key1", "newkey", cache.awaitForFutureOrElse(d, null));
+
+
+
+        Thread.sleep(1500);
+    }
+
+    @Test
+    public void testStaleMemcachedCache() throws InterruptedException {
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(1))
+                        .setUseStaleCache(true)
+                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.NONE)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will be stale";
+        }, executorService);
+
+        assertEquals("Value should be key1", "will be stale", cache.awaitForFutureOrElse(val, null));
+
+        Thread.sleep(2000);
+
+        ListenableFuture<String> val_again = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate";
+        }, executorService);
+
+        ListenableFuture<String> val_again2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate over and over";
+        }, executorService);
+
+
+        assertEquals("Value should be key1", "will not generate", cache.awaitForFutureOrElse(val_again, null));
+        assertEquals("Value should be key1", "will be stale", cache.awaitForFutureOrElse(val_again2, null));
+
+        Thread.sleep(6000);
+
+
+        ListenableFuture<String> val_again3 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate over and over";
+        }, executorService);
+
+
+        assertEquals("Value should be key1", "will not generate over and over", cache.awaitForFutureOrElse(val_again3, null));
+        Thread.sleep(3000);
+
+        ListenableFuture<String> a = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will generate new val (for stale)";
+        }, executorService);
+
+        assertEquals("Value should be key1", "will generate new val (for stale)", cache.awaitForFutureOrElse(a, null));
+
+        Thread.sleep(2500);
+
+        ListenableFuture<String> b = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will generate this value";
+        }, executorService);
+
+
+
+        ListenableFuture<String> c = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "will not generate this value";
+        }, executorService);
+
+        Thread.sleep(300);
+
+
+        ((ClearableCache)cache).clear("Key1");
+
+        ListenableFuture<String> d = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "newkey (in stale)";
+        }, executorService);
+
+        Thread.sleep(2500);
+
+        ListenableFuture<String> ef = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "newkey";
+        }, executorService);
+
+        ListenableFuture<String> f = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "newkey (will not be used)";
+        }, executorService);
+
+
+
+        assertEquals("Value should be key1", "will generate this value", cache.awaitForFutureOrElse(b, null));
+        assertEquals("Value should be key1", "will generate new val (for stale)", cache.awaitForFutureOrElse(c, null));
+        assertEquals("Value should be key1", "newkey (in stale)", cache.awaitForFutureOrElse(d, null));
+        assertEquals("Value should be key1", "newkey", cache.awaitForFutureOrElse(ef, null));
+        assertEquals("Value should be key1", "newkey (in stale)", cache.awaitForFutureOrElse(f, null));
+
+
+
+
+        Thread.sleep(1500);
+    }
+
+
+    @Test
     public void testStaleMemcachedCacheWithNoSuchItems() throws InterruptedException {
 
         cache = new SpyMemcachedCache<>(
