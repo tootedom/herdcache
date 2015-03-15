@@ -1,7 +1,7 @@
 package org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain;
 
 /**
- * Created by dominictootell on 30/08/2014.
+ *
  */
 public class ElastiCacheHost {
     private final String hostName;

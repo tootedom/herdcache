@@ -3,6 +3,7 @@ package org.greencheek.caching.herdcache.memcached.elasticacheconfig.client;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.confighandler.AsyncConfigInfoMessageHandler;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.handler.RequestConfigInfoScheduler;
 
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,6 +26,8 @@ public class ConfigRetrievalSettings {
 
     private final ElastiCacheServerConnectionDetails[] elasticacheConfigHosts;
 
+    private final Optional<ElastiCacheConfigServerUpdater> configUrlUpdater;
+
     public ConfigRetrievalSettings(RequestConfigInfoScheduler scheduledConfigRetrieval,
                                    AsyncConfigInfoMessageHandler obtainedConfigHandler,
                                    ElastiCacheServerConnectionDetails[] configurationServerConnectionDetails,
@@ -33,7 +36,9 @@ public class ConfigRetrievalSettings {
                                    TimeUnit reconnectDelayTimeUnit,
                                    long reconnectDelay,
                                    int noInvalidConfigsBeforeReconnect,
-                                   int connectionTimeoutInMillis) {
+                                   int connectionTimeoutInMillis,
+                                   Optional<ElastiCacheConfigServerUpdater> configUrlUpdater
+    ) {
         this.scheduledConfigRetrieval = scheduledConfigRetrieval;
         this.configInfoMessageHandler = obtainedConfigHandler;
         this.elasticacheConfigHosts = new ElastiCacheServerConnectionDetails[configurationServerConnectionDetails.length];
@@ -47,6 +52,7 @@ public class ConfigRetrievalSettings {
         this.reconnectDelay = reconnectDelay;
         this.numberOfConsecutiveInvalidConfigsBeforeReconnect = noInvalidConfigsBeforeReconnect;
         this.connectionTimeoutInMillis = connectionTimeoutInMillis;
+        this.configUrlUpdater = configUrlUpdater;
     }
 
     public RequestConfigInfoScheduler getScheduledConfigRetrieval() {
@@ -83,5 +89,9 @@ public class ConfigRetrievalSettings {
 
     public int getConnectionTimeoutInMillis() {
         return connectionTimeoutInMillis;
+    }
+
+    public Optional<ElastiCacheConfigServerUpdater> getConfigUrlUpdater() {
+        return configUrlUpdater;
     }
 }

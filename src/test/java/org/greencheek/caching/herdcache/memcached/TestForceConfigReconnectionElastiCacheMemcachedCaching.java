@@ -8,6 +8,8 @@ import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheConfigServerUpdater;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.SimpleVolatileBasedElastiCacheConfigServerUpdater;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.server.StringServer;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
@@ -18,8 +20,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.sql.Time;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -29,7 +34,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Created by dominictootell on 25/08/2014.
  */
-public class TestMultipleHostsElastiCacheMemcachedCaching {
+public class TestForceConfigReconnectionElastiCacheMemcachedCaching {
 
 
     private MemcachedDaemonWrapper memcached1;
@@ -71,7 +76,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
         }
     }
 
-    private void testStaleCaching(CacheWithExpiry cache) {
+    private void testCaching(CacheWithExpiry cache) {
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
                 Thread.sleep(1000);
@@ -126,7 +131,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
         assertEquals("Value should be key1", "TO BE STALE CONTENT", cache.awaitForFutureOrElse(val4, null));
         assertEquals("Value should be key1", "TO BE STALE CONTENT", cache.awaitForFutureOrElse(val5, null));
 
-        assertEquals("Value should be key1", "New Value", cache.awaitForFutureOrElse(passThrough, null));
+        assertEquals("Value should be key1", "TO BE STALE CONTENT", cache.awaitForFutureOrElse(passThrough, null));
 
 
         ListenableFuture<String> val6 = cache.apply("Key1", () -> {
@@ -134,7 +139,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
         }, executorService);
 
 
-        assertEquals("Value should be key1", "New Value", cache.awaitForFutureOrElse(val6, null));
+        assertEquals("Value should be key1", "TO BE STALE CONTENT", cache.awaitForFutureOrElse(val6, null));
 
 
         Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(200);
@@ -153,23 +158,30 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
 
     private void testHashAlgorithm(HashAlgorithm algo) {
 
-        String[] configurationsMessage = new String[]{
-                "CONFIG cluster 0 147\r\n" + "1\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + "\r\n" + "\nEND\r\n",
-                "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
-
+        String[] configurationsMessage1 = new String[]{
+                "CONFIG cluster 0 147\r\n" + "1\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + "\r\n" + "\nEND\r\n"
         };
 
-        StringServer server = new StringServer(configurationsMessage, 0, TimeUnit.SECONDS);
-        server.before(configurationsMessage, TimeUnit.SECONDS, -1, false);
+        String[] configurationsMessage2 = new String[]{
+                "CONFIG cluster 0 147\r\n" + "1\r\n" + "localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n"
+        };
 
+        StringServer configServer1 = new StringServer(configurationsMessage1, 0, TimeUnit.SECONDS);
+        configServer1.before(configurationsMessage1, TimeUnit.SECONDS, -1, false);
+
+
+        StringServer configServer2 = new StringServer(configurationsMessage2, 0, TimeUnit.SECONDS);
+        configServer2.before(configurationsMessage2, TimeUnit.SECONDS, -1, false);
+
+        ElastiCacheConfigServerUpdater configServerUpdater = new SimpleVolatileBasedElastiCacheConfigServerUpdater();
 
         try {
             cache = new ElastiCacheMemcachedCache<String>(
                     new ElastiCacheCacheConfigBuilder()
-                            .setElastiCacheConfigHosts("localhost:" + server.getPort())
+                            .setElastiCacheConfigHosts("localhost:" + configServer1.getPort())
                             .setConfigPollingTime(Duration.ofSeconds(10))
                             .setInitialConfigPollingDelay(Duration.ofSeconds(0))
-                            .setTimeToLive(Duration.ofSeconds(2))
+                            .setTimeToLive(Duration.ofSeconds(5))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                             .setWaitForMemcachedSet(true)
                             .setHashAlgorithm(algo)
@@ -178,7 +190,8 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
                             .setUseStaleCache(true)
                             .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
                             .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
-                            .setUpdateConfigOnlyOnVersionChange(true)
+                            .setConfigUrlUpdater(configServerUpdater)
+                            .setReconnectDelay(Duration.ofMillis(100))
                             .buildElastiCacheMemcachedConfig()
             );
 
@@ -189,28 +202,27 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
             }
 
 
-            testStaleCaching(cache);
+            testCaching(cache);
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>=1);
 
-
-            if(cache instanceof ClearableCache) {
-                ((ClearableCache)cache).clear(true);
-            }
-
+            configServerUpdater.connectionUpdated("localhost:" + configServer2.getPort());
             try {
                 Thread.sleep(7000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            testStaleCaching(cache);
+
+
+            testCaching(cache);
 
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>1);
             assertTrue(memcached2.getDaemon().getCache().getCurrentItems()>1);
 
         }
         finally {
-            server.after();
+            configServer1.after();
+            configServer2.after();
             if(cache instanceof RequiresShutdown) {
                 ((RequiresShutdown)cache).shutdown();
             }

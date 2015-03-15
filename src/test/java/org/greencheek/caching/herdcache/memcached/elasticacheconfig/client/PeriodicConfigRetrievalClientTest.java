@@ -11,9 +11,9 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -113,6 +113,8 @@ public class PeriodicConfigRetrievalClientTest {
     }
 
 
+
+
     @Test
     @ConfigMessage(message = {"CONFIG cluster 0 147\r\n" +
             "1.5\r\n" +
@@ -167,6 +169,79 @@ public class PeriodicConfigRetrievalClientTest {
 
         boolean ok=false;
         try {
+            ok = latch.await(30, TimeUnit.SECONDS);
+        } catch(InterruptedException e) {
+            fail("problem waiting for config retrieval");
+        }
+
+        assertTrue(ok);
+        assertEquals(7,invalid.get());
+    }
+
+
+    @Test
+    @ConfigMessage(message = {"CONFIG cluster 0 147\r\n" +
+            "1.5\r\n" +
+            "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+            "END\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    "-1.5\r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    "0xf\r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    "-\r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    ".\r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    " \r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n",
+            "CONFIG cluster 0 147\r\n" +
+                    (char)1+"\r\n" +
+                    "myCluster.pc4ldq.0001.use1.cache.amazonaws.com|10.82.235.120|11211 myCluster.pc4ldq.0002.use1.cache.amazonaws.com|10.80.249.27|11211\r\n" +
+                    "\nEND\r\n"
+    })
+    public void testUpdateConfiguration() {
+
+        ScheduledExecutorService sexec = Executors.newSingleThreadScheduledExecutor();
+        ConfigRetrievalSettingsBuilder builder = new ConfigRetrievalSettingsBuilder();
+        final CountDownLatch latch = new CountDownLatch(7);
+        final AtomicInteger invalid = new AtomicInteger(0);
+        ConfigInfoProcessor processor = new ConfigInfoProcessor() {
+            @Override
+            public void processConfig(ConfigInfo info) {
+                System.out.println(info);
+                latch.countDown();
+                if(!info.isValid()) invalid.incrementAndGet();
+            }
+        };
+
+        final ElastiCacheConfigServerUpdater configUpdator = new SimpleVolatileBasedElastiCacheConfigServerUpdater();
+
+        builder.setConfigInfoProcessor(processor);
+        builder.setConfigPollingTime(0,2, TimeUnit.SECONDS);
+        builder.setIdleReadTimeout(70, TimeUnit.SECONDS);
+        builder.setReconnectDelay(1000,TimeUnit.MILLISECONDS);
+        builder.addElastiCacheHost(new ElastiCacheServerConnectionDetails("localhost",server.getPort()));
+        builder.setNumberOfInvalidConfigsBeforeReconnect(10);
+        builder.setConfigUrlUpdater(Optional.of(configUpdator));
+
+        client = new PeriodicConfigRetrievalClient(builder.build());
+        client.start();
+
+        boolean ok=false;
+        try {
+            sexec.scheduleWithFixedDelay(()->{
+                configUpdator.connectionUpdated("localhost:"+server.getPort());
+            },0,11,TimeUnit.SECONDS);
             ok = latch.await(30, TimeUnit.SECONDS);
         } catch(InterruptedException e) {
             fail("problem waiting for config retrieval");

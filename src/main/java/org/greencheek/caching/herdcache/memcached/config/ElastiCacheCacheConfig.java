@@ -1,10 +1,13 @@
 package org.greencheek.caching.herdcache.memcached.config;
 
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheConfigServerUpdater;
 
+import javax.swing.text.html.Option;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Created by dominictootell on 24/08/2014.
@@ -22,6 +25,8 @@ public class ElastiCacheCacheConfig {
     private final int numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
     private final boolean updateConfigVersionOnDnsTimeout;
     private final List<ClientClusterUpdateObserver> clusterUpdatedObservers;
+    private final Optional<ElastiCacheConfigServerUpdater> configUrlUpdater;
+    private final boolean updateConfigOnlyOnVersionChange;
 
     public ElastiCacheCacheConfig(MemcachedCacheConfig memcachedConf,
                                   String elastiCacheConfigHosts,
@@ -33,7 +38,9 @@ public class ElastiCacheCacheConfig {
             Duration delayBeforeClientClose,
             int numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
             boolean updateConfigVersionOnDnsTimeout,
-            List<ClientClusterUpdateObserver> clusterUpdatedObservers) {
+            List<ClientClusterUpdateObserver> clusterUpdatedObservers,
+            Optional<ElastiCacheConfigServerUpdater> configServerUpdater,
+            boolean updateConfigOnlyOnVersionChange) {
         this.memcachedCacheConfig = memcachedConf;
         this.elastiCacheConfigHosts = elastiCacheConfigHosts;
         this.configPollingTime = configPollingTime;
@@ -45,8 +52,10 @@ public class ElastiCacheCacheConfig {
         this.numberOfConsecutiveInvalidConfigurationsBeforeReconnect = numberOfConsecutiveInvalidConfigurationsBeforeReconnect;
         this.updateConfigVersionOnDnsTimeout = updateConfigVersionOnDnsTimeout;
         this.clusterUpdatedObservers = new ArrayList<ClientClusterUpdateObserver>(clusterUpdatedObservers.size());
+        this.configUrlUpdater = configServerUpdater;
 
         this.clusterUpdatedObservers.addAll(clusterUpdatedObservers);
+        this.updateConfigOnlyOnVersionChange = updateConfigOnlyOnVersionChange;
     }
 
     public MemcachedCacheConfig getMemcachedCacheConfig() {
@@ -91,5 +100,13 @@ public class ElastiCacheCacheConfig {
 
     public List<ClientClusterUpdateObserver> getClusterUpdatedObservers() {
         return this.clusterUpdatedObservers;
+    }
+
+    public Optional<ElastiCacheConfigServerUpdater> getConfigUrlUpdater() {
+        return this.configUrlUpdater;
+    }
+
+    public boolean isUpdateConfigOnlyOnVersionChange() {
+        return updateConfigOnlyOnVersionChange;
     }
 }

@@ -9,6 +9,7 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.handler.Requ
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,6 +57,7 @@ public class ConfigRetrievalSettingsBuilder {
     private int numberOfInvalidConfigsBeforeReconnect = NO_CONSECUTIVE_INVALID_CONFIGS_BEFORE_RECONNECT;
 
     private List<ElastiCacheServerConnectionDetails> elasticCacheHosts = new ArrayList<ElastiCacheServerConnectionDetails>();
+    private Optional<ElastiCacheConfigServerUpdater> configUrlUpdater = Optional.empty();
 
     public  ConfigRetrievalSettingsBuilder addElastiCacheHost(ElastiCacheServerConnectionDetails details) {
         elasticCacheHosts.add(details);
@@ -116,6 +118,10 @@ public class ConfigRetrievalSettingsBuilder {
         return this;
     }
 
+    public void setConfigUrlUpdater(Optional<ElastiCacheConfigServerUpdater> configUrlUpdater) {
+        this.configUrlUpdater = configUrlUpdater;
+    }
+
     public ConfigRetrievalSettings build() {
         AsyncConfigInfoMessageHandler messageHandler;
         RequestConfigInfoScheduler periodicConfigObtainer;
@@ -142,9 +148,7 @@ public class ConfigRetrievalSettingsBuilder {
 
         return new ConfigRetrievalSettings(periodicConfigObtainer,messageHandler,
                 elasticCacheHosts.toArray(new ElastiCacheServerConnectionDetails[elasticCacheHosts.size()]),idleTimeoutTimeUnit,idleReadTimeout,
-                reconnectDelayTimeUnit,reconnectDelay, numberOfInvalidConfigsBeforeReconnect,connectionTimeoutInMillis);
+                reconnectDelayTimeUnit,reconnectDelay, numberOfInvalidConfigsBeforeReconnect,connectionTimeoutInMillis,configUrlUpdater);
     }
-
-
 
 }

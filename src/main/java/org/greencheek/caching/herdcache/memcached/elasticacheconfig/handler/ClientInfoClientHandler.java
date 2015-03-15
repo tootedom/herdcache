@@ -42,13 +42,16 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
     private final AtomicInteger invalidConsecutiveConfigs = new AtomicInteger(0);
     private final int maxConsecutiveInvalidConfigsBeforeReconnect;
 
+    private final ForceReconnectHandler reconnectHandler;
+
     public ClientInfoClientHandler(RequestConfigInfoScheduler getConfigCommand,
                                    AsyncConfigInfoMessageHandler handler,
                                    TimeUnit reconnectTimeUnit,long reconnectDelay,
                                    TimeUnit idleReadTimeUnit, long idleReadTimeout,
                                    ElastiCacheConfigServerChooser configServerChooser,
                                    int noInvalidConfigsBeforeReconnect,
-                                   int connectionTimeoutInMillis) {
+                                   int connectionTimeoutInMillis,
+                                   ForceReconnectHandler reconnectHandler) {
         this.obtainConfigComand = getConfigCommand;
         this.asyncConfigInfoMessageHandler = handler;
         this.reconnectTimeUnit = reconnectTimeUnit;
@@ -58,6 +61,7 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
         this.configServerChooser = configServerChooser;
         this.maxConsecutiveInvalidConfigsBeforeReconnect = noInvalidConfigsBeforeReconnect;
         this.connectionTimeoutInMillis = connectionTimeoutInMillis;
+        this.reconnectHandler = reconnectHandler;
     }
 
     @Override
@@ -74,18 +78,23 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-        if (!(evt instanceof IdleStateEvent)) {
+        if (!(evt instanceof IdleStateEvent) && !(evt instanceof ReconnectEvent)) {
             return;
         }
 
-        IdleStateEvent e = (IdleStateEvent) evt;
-        if (e.state() == IdleState.READER_IDLE) {
-            // The connection was OK but there was no traffic for last period.
-            log.info("Disconnecting due to no response on connection for config retrieval.  A reconnect will occur.");
-            ctx.close();
-        } else if(e.state() == IdleState.WRITER_IDLE) {
-            // The connection was OK but there was no traffic for last period.
-            log.info("Disconnecting due to no traffic on connection, either read or write.  A reconnect will occur.");
+        if(evt instanceof IdleStateEvent) {
+            IdleStateEvent e = (IdleStateEvent) evt;
+            if (e.state() == IdleState.READER_IDLE) {
+                // The connection was OK but there was no traffic for last period.
+                log.info("Disconnecting due to no response on connection for config retrieval.  A reconnect will occur.");
+                ctx.close();
+            } else if (e.state() == IdleState.WRITER_IDLE) {
+                // The connection was OK but there was no traffic for last period.
+                log.info("Disconnecting due to no traffic on connection, either read or write.  A reconnect will occur.");
+                ctx.close();
+            }
+        } else {
+            log.info("Disconnecting due to request to perform a reconnection.");
             ctx.close();
         }
     }
@@ -98,7 +107,7 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
         if(log.isInfoEnabled()) {
-            log.info("Sleeping for {}s before reconnect.", reconnectTimeUnit.toSeconds(reconnectDelay));
+            log.info("Sleeping for {}ms before reconnect.", reconnectTimeUnit.toMillis(reconnectDelay));
         }
 
         final ClientInfoClientHandler handler = this;
@@ -108,7 +117,7 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
             public void run() {
                 log.info("Reconnecting");
                 PeriodicConfigRetrievalClient.configureBootstrap(configServerChooser, handler, new Bootstrap(), loop,
-                        idleReadTimeUnit,idleReadTimeout,connectionTimeoutInMillis);
+                        idleReadTimeUnit,idleReadTimeout,connectionTimeoutInMillis,reconnectHandler);
             }
         }, reconnectDelay, reconnectTimeUnit);
     }

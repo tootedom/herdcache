@@ -4,13 +4,15 @@ import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheConfigServerUpdater;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Created by dominictootell on 24/08/2014.
+ *
  */
 public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<ElastiCacheCacheConfigBuilder> {
 
@@ -24,9 +26,16 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
     private int numberOfConsecutiveInvalidConfigurationsBeforeReconnect = 3;
     private boolean updateConfigVersionOnDnsTimeout = true;
     private List<ClientClusterUpdateObserver> clusterUpdatedObservers = new ArrayList<>();
+    private Optional<ElastiCacheConfigServerUpdater> configUrlUpdater = Optional.empty();
+    private boolean updateConfigOnlyOnVersionChange = false;
 
     public ElastiCacheCacheConfigBuilder setElastiCacheConfigHosts(String urls) {
         this.elastiCacheConfigHosts = urls;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setConfigUrlUpdater(ElastiCacheConfigServerUpdater configUrlUpdater) {
+        this.configUrlUpdater = Optional.of(configUrlUpdater);
         return self();
     }
 
@@ -75,6 +84,11 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
         return self();
     }
 
+    public ElastiCacheCacheConfigBuilder setUpdateConfigOnlyOnVersionChange(boolean updateConfigOnlyOnVersionChange) {
+        this.updateConfigOnlyOnVersionChange = updateConfigOnlyOnVersionChange;
+        return self();
+    }
+
     @Override
     public ElastiCacheCacheConfig buildElastiCacheMemcachedConfig() {
         return new ElastiCacheCacheConfig(buildMemcachedConfig(),
@@ -87,7 +101,9 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
                 delayBeforeClientClose,
                 numberOfConsecutiveInvalidConfigurationsBeforeReconnect,
                 updateConfigVersionOnDnsTimeout,
-                clusterUpdatedObservers
+                clusterUpdatedObservers,
+                configUrlUpdater,
+                updateConfigOnlyOnVersionChange
         );
 
     }

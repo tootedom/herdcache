@@ -5,6 +5,7 @@ import org.greencheek.caching.herdcache.memcached.config.Host;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.CommaSeparatedHostAndPortStringParser;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
+import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheConfigHostsParser;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.LocalhostElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.factory.ElastiCacheClientFactory;
@@ -24,7 +25,7 @@ public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
     private ElastiCacheMemcachedCache(MemcachedCacheConfig mConfig,ElastiCacheCacheConfig config) {
         super(new ElastiCacheClientFactory(
              createMemcachedConnectionFactory(mConfig),
-                parseElastiCacheConfigHosts(config.getElastiCacheConfigHosts()),
+                ElastiCacheConfigHostsParser.parseElastiCacheConfigHosts(config.getElastiCacheConfigHosts()),
                 config.getConfigPollingTime(),
                 config.getInitialConfigPollingDelay(),
                 config.getIdleReadTimeout(),
@@ -35,36 +36,11 @@ public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
                 config.isUpdateConfigVersionOnDnsTimeout(),
                 config.getNumberOfConsecutiveInvalidConfigurationsBeforeReconnect(),
                 config.getConnectionTimeoutInMillis(),
-                config.getClusterUpdatedObservers()
+                config.getClusterUpdatedObservers(),
+                config.getConfigUrlUpdater(),
+                config.isUpdateConfigOnlyOnVersionChange()
         ),mConfig);
     }
 
-    private static ElastiCacheServerConnectionDetails[] parseElastiCacheConfigHosts(String hostsString) {
-        HostStringParser hostStringParser  = new CommaSeparatedHostAndPortStringParser();
-        String hosts = null;
-        if(hostsString == null || hostsString.trim().length() == 0) {
-            hosts = "localhost:11211";
-        } else {
-            hosts = hostsString;
-        }
 
-        List<Host> parsedHosts = hostStringParser.parseMemcachedNodeList(hosts);
-
-        ElastiCacheServerConnectionDetails[] connectionDetails = (parsedHosts.size()>0) ?
-            new ElastiCacheServerConnectionDetails[parsedHosts.size()] :
-            new ElastiCacheServerConnectionDetails[0];
-
-        int i = 0;
-        while(i<parsedHosts.size()) {
-            Host details = parsedHosts.get(i);
-            connectionDetails[i] = new ElastiCacheServerConnectionDetails(details.getHost(),details.getPort());
-            i++;
-        }
-
-        if(parsedHosts.size()==0) {
-            connectionDetails[0] = new LocalhostElastiCacheServerConnectionDetails();
-        }
-
-        return connectionDetails;
-    }
 }

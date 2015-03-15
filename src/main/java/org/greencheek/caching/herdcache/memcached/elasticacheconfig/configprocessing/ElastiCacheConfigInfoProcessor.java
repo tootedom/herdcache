@@ -10,7 +10,10 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.Elast
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 
 /**
@@ -24,17 +27,21 @@ public class ElastiCacheConfigInfoProcessor implements ConfigInfoProcessor {
     private final UpdateClientService updateClientService;
     private final boolean updateConfigVersionOnDnsTimeout;
     private final List<ClientClusterUpdateObserver> clientClusterUpdateObservers;
+    private final boolean updateConfigOnlyOnVersionChange;
 
     private volatile long currentConfigVersionNumber = Long.MIN_VALUE;
+    private volatile Map<String,ElastiCacheHost> currentElastiCacheHosts = Collections.emptyMap();
 
     public ElastiCacheConfigInfoProcessor(ElastiCacheConfigParser configParser,
                                           UpdateClientService updateClientService,
                                           boolean updateConfigVersionOnDnsTimeout,
-                                          List<ClientClusterUpdateObserver> clientClusterUpdateObservers) {
+                                          List<ClientClusterUpdateObserver> clientClusterUpdateObservers,
+                                          boolean updateConfigOnlyOnVersionChange) {
         this.configParser = configParser;
         this.updateClientService = updateClientService;
         this.updateConfigVersionOnDnsTimeout = updateConfigVersionOnDnsTimeout;
         this.clientClusterUpdateObservers = clientClusterUpdateObservers;
+        this.updateConfigOnlyOnVersionChange = updateConfigOnlyOnVersionChange;
     }
 
 
@@ -45,13 +52,17 @@ public class ElastiCacheConfigInfoProcessor implements ConfigInfoProcessor {
             long currentVersion = currentConfigVersionNumber;
             long latestConfigVersion = info.getVersion();
 
-            if (latestConfigVersion > currentVersion) {
-                logger.info("Configuration version has increased.  Reconfiguring client");
+            logger.info("Cluster Configuration: {}",info.getServers());
+            List<ElastiCacheHost> parsedServers = configParser.parseServers(info.getServers());
 
-                List<ElastiCacheHost> parsedServers = configParser.parseServers(info.getServers());
+
+            if (hasConfigChanged(currentVersion,latestConfigVersion,parsedServers)) {
+                logger.info("Configuration cluster info has changed.  Reconfiguring client");
+
                 ReferencedClient updatedClient = updateClientService.updateClientConnections(parsedServers);
                 if (updateConfigVersionOnDnsTimeout == true || updatedClient.getResolvedHosts().size() == parsedServers.size()) {
                     currentConfigVersionNumber = latestConfigVersion;
+                    currentElastiCacheHosts = toMapByHostName(parsedServers);
                 }
                 updated = true;
             } else if (latestConfigVersion == currentVersion) {
@@ -64,6 +75,58 @@ public class ElastiCacheConfigInfoProcessor implements ConfigInfoProcessor {
             logger.debug("Invalid configuration provided for elasticache configuration");
         }
         notifyObservers(updated);
+    }
+
+    private boolean hasConfigChanged(long currentVersion, long latestConfigVersion, List<ElastiCacheHost> parsedServers) {
+        if(updateConfigOnlyOnVersionChange) {
+            return latestConfigVersion > currentVersion;
+        }
+        else {
+            return (latestConfigVersion > currentVersion || differentElastiCacheHosts(parsedServers));
+        }
+    }
+
+    private Map<String,ElastiCacheHost> toMapByHostName(List<ElastiCacheHost> hosts) {
+        return hosts.stream().collect(Collectors.toMap(ElastiCacheConfigInfoProcessor::createKey, (host)->(host)));
+    }
+
+    private static String createKey(ElastiCacheHost host) {
+        return host.getHostName() +
+                host.getIp() +
+                host.getPort();
+    }
+
+    private boolean differentElastiCacheHosts(List<ElastiCacheHost> parsedHosts) {
+        Map<String,ElastiCacheHost> currentHosts = currentElastiCacheHosts;
+        int currentHostsSize = currentHosts.size();
+        if(currentHostsSize!=parsedHosts.size()) {
+            return true;
+        }
+
+        int foundHosts = 0;
+        for(ElastiCacheHost host : parsedHosts) {
+            ElastiCacheHost currentHost = currentElastiCacheHosts.get(createKey(host));
+            if(currentHost==null) {
+                return true;
+            }
+            else {
+                if( currentHost.hasIP() != host.hasIP()
+                ||  !currentHost.getIp().equals(host.getIp())
+                ||  currentHost.getPort() != host.getPort())
+                {
+                    return true;
+                }
+
+            }
+            foundHosts++;
+        }
+
+        if(foundHosts!=parsedHosts.size()) {
+            return true;
+        }
+
+        return false;
+
     }
 
     private void notifyObservers(boolean updated) {
