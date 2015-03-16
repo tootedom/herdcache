@@ -38,7 +38,7 @@ The below details how to use the caching implementations, the differences betwee
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.7</version>
+  <version>1.0.10</version>
 </dependency>
 ----
 
@@ -869,6 +869,52 @@ configuration, the memcached client will again be recreated, to point to the hos
 Note if the dns resolution is constantly failing then client memcached client will constantly be re-created each time
 the configuration polling occurs. No validation of the previously resolved hosts, and the current resolved hosts is performed.
 The client will just be recreated.
+
+'''
+
+==== ElastiCache Configuration Url Endpoint update
+
+
+This feature is available in `1.0.9` and above.
+
+As previous discussed above, when you create an ElastiCache cache you provide the url to the configuration endpoint:
+
+[source,java]
+----
+CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setElastiCacheConfigHosts("yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211")
+----
+
+It is possible that you might wish to create another cluster, with a different machine type, and switch the ElastiCache
+cache over at runtime to the new cluster.  For example, you are moving the cache types to faster cpu type machines.
+
+It is possible to do this by constructing a `SimpleVolatileBasedElastiCacheConfigServerUpdater` and passing that to the
+builder:
+
+[source,java]
+----
+ElastiCacheConfigServerUpdater configUrlUpdater = new SimpleVolatileBasedElastiCacheConfigServerUpdater()
+
+CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setElastiCacheConfigHosts("yourcluster.jgkygp.0001.euw1.cache.amazonaws.com:11211")
+                            .setConfigUrlUpdater(configUrlUpdater)
+                            .buildElastiCacheMemcachedConfig())
+----
+
+You would then code a JMX hook, or admin REST endpoint in your application that called the method: `connectionUpdated(String url)`
+to inform the cache that the configuration url has changed, and that it should connect to the new url to
+obtain the new list of cache cluster nodes.
+
+[source,java]
+----
+configUrlUpdater.connectionUpdated("yourcluster.irujgk.0001.euw1.cache.amazonaws.com:11211")
+----
+
+The cache will connect to the new config cluster endpoint and obtain the cache cluster nodes.  The cache will wait for
+`setReconnectDelay(Duration.ofSeconds(5))` (5 seconds is the default), before attempting the connection to the new cluster
+config endpoint.  You can reduce or increase this timeout.
 
 '''
 
