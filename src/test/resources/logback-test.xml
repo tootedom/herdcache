@@ -13,6 +13,8 @@
 
     <logger name="net.spy" level="WARN"/>
     <logger name="com.thimbleware.jmemcached" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="org.greencheek.caching.herdcache.memcached.spy.extensions" level="WARN"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

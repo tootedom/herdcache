@@ -21,7 +21,7 @@ public class ForceReconnectHandler extends ChannelHandlerAdapter {
      */
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        log.info("force reconnect handler added");
+        log.debug("force reconnect handler added");
         this.ctx = ctx;
     }
 
@@ -31,7 +31,7 @@ public class ForceReconnectHandler extends ChannelHandlerAdapter {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         // NOOP
-        log.info("force reconnect handler removed");
+        log.debug("force reconnect handler removed");
         this.ctx = null;
     }
 

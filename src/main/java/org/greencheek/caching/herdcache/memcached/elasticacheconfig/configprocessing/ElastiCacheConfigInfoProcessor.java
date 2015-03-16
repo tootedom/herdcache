@@ -52,7 +52,7 @@ public class ElastiCacheConfigInfoProcessor implements ConfigInfoProcessor {
             long currentVersion = currentConfigVersionNumber;
             long latestConfigVersion = info.getVersion();
 
-            logger.info("Cluster Configuration: {}",info.getServers());
+            logger.debug("Cluster Configuration: {}",info.getServers());
             List<ElastiCacheHost> parsedServers = configParser.parseServers(info.getServers());
 
 

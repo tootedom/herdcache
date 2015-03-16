@@ -106,8 +106,8 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
 
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
-        if(log.isInfoEnabled()) {
-            log.info("Sleeping for {}ms before reconnect.", reconnectTimeUnit.toMillis(reconnectDelay));
+        if(log.isDebugEnabled()) {
+            log.debug("Sleeping for {}ms before reconnect.", reconnectTimeUnit.toMillis(reconnectDelay));
         }
 
         final ClientInfoClientHandler handler = this;
@@ -115,7 +115,7 @@ public class ClientInfoClientHandler extends SimpleChannelInboundHandler<ConfigI
         loop.schedule(new Runnable() {
             @Override
             public void run() {
-                log.info("Reconnecting");
+                log.debug("Reconnecting");
                 PeriodicConfigRetrievalClient.configureBootstrap(configServerChooser, handler, new Bootstrap(), loop,
                         idleReadTimeUnit,idleReadTimeout,connectionTimeoutInMillis,reconnectHandler);
             }
