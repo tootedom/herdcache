@@ -26,9 +26,12 @@ package org.greencheek.caching.herdcache.memcached.spy.extensions;
 import net.spy.memcached.CachedData;
 import net.spy.memcached.compat.CloseUtil;
 import net.spy.memcached.compat.SpyObject;
+
 import org.greencheek.caching.herdcache.memcached.util.ResizableByteBufferNoBoundsCheckingBackedOutputStream;
 import org.greencheek.caching.herdcache.memcached.util.ThreadUnsafeByteArrayInputStream;
-import org.iq80.snappy.Snappy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -41,6 +44,7 @@ import java.io.UnsupportedEncodingException;
  */
 public abstract class BaseSerializingTranscoder extends SpyObject {
 
+    private static Logger logger = LoggerFactory.getLogger(BaseSerializingTranscoder.class);
     /**
      * Default compression threshold value.
      */
@@ -52,6 +56,7 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
     protected String charset = DEFAULT_CHARSET;
 
     private final int maxSize;
+
 
     /**
      * Initialize a serializing transcoder with the given maximum data size.
@@ -135,10 +140,10 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
                 bis.close();
             }
         } catch (IOException e) {
-            getLogger().warn("Caught IOException decoding %d bytes of data",
+            logger.warn("Caught IOException decoding {} bytes of data",
                     in == null ? 0 : in.length, e);
         } catch (ClassNotFoundException e) {
-            getLogger().warn("Caught CNFE decoding %d bytes of data",
+            logger.warn("Caught CNFE decoding {} bytes of data",
                     in == null ? 0 : in.length, e);
         } finally {
             CloseUtil.close(is);
@@ -161,7 +166,7 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
         } catch (Exception e) {
             throw new RuntimeException("IO exception compressing data", e);
         }
-        getLogger().debug("Compressed %d bytes to %d", in.length, compressed.length);
+        logger.debug("Compressed {} bytes to {}", in.length, compressed.length);
         return compressed;
     }
 
@@ -174,9 +179,9 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
         byte[] decompressed = null;
         if (in != null) {
             try {
-                decompressed = Snappy.uncompress(in, 0, in.length);
+                decompressed = Snappy.uncompress(in);
             } catch (Exception e) {
-                getLogger().warn("Failed to decompress data", e);
+                logger.warn("Failed to decompress data", e);
                 return null;
             }
         }

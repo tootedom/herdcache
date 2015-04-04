@@ -1,5 +1,7 @@
 package org.greencheek.caching.herdcache.memcached;
 
+import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -8,6 +10,7 @@ import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
+import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
 import org.junit.After;
@@ -16,8 +19,10 @@ import org.junit.Test;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -53,6 +58,11 @@ public class TestStaleMemcachedCaching {
 
     @Test
     public void testMemcachedCache() throws InterruptedException {
+        MetricRegistry registry = new MetricRegistry();
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
 
         cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
@@ -63,6 +73,7 @@ public class TestStaleMemcachedCaching {
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setStaleCachePrefix("staleprefix")
                         .setWaitForMemcachedSet(true)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
                         .buildMemcachedConfig()
         );
 
@@ -101,8 +112,12 @@ public class TestStaleMemcachedCaching {
 
         assertEquals("Value should be key1","will not generate",cache.awaitForFutureOrElse(val2, null));
 
+        reporter.report();
+        reporter.stop();
+        assertTrue(registry.getNames().contains("stale_distributed_cache_hitrate"));
 
 
+        System.out.println(registry.getNames());
     }
 
     @Test

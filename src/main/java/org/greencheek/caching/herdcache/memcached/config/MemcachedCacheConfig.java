@@ -5,6 +5,7 @@ import net.spy.memcached.transcoders.Transcoder;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
+import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -41,6 +42,7 @@ public class MemcachedCacheConfig {
     private final boolean removeFutureFromInternalCacheBeforeSettingValue;
     private final boolean hashKeyPrefix;
     private final Duration waitForRemove;
+    private final MetricRecorder metricsRecorder;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -68,7 +70,8 @@ public class MemcachedCacheConfig {
                                 Duration staleCacheMemachedGetTimeout,
                                 boolean removeFutureFromInternalCacheBeforeSettingValue,
                                 boolean hashKeyPrefix,
-                                Duration waitForRemove) {
+                                Duration waitForRemove,
+                                MetricRecorder metricsRecorder) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -96,6 +99,7 @@ public class MemcachedCacheConfig {
         this.removeFutureFromInternalCacheBeforeSettingValue = removeFutureFromInternalCacheBeforeSettingValue;
         this.hashKeyPrefix = hashKeyPrefix;
         this.waitForRemove = waitForRemove;
+        this.metricsRecorder = metricsRecorder;
     }
 
     public Duration getTimeToLive() {
@@ -216,5 +220,9 @@ public class MemcachedCacheConfig {
 
     public Duration getWaitForRemove() {
         return waitForRemove;
+    }
+
+    public MetricRecorder getMetricsRecorder() {
+        return metricsRecorder;
     }
 }

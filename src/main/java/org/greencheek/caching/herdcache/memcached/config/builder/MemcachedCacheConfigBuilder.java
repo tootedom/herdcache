@@ -7,8 +7,9 @@ import org.greencheek.caching.herdcache.memcached.config.hostparsing.CommaSepara
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.AddressByNameHostResolver;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
-import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
+import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
+import org.greencheek.caching.herdcache.memcached.metrics.NoOpMetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
 
 import java.time.Duration;
@@ -45,6 +46,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private boolean removeFutureFromInternalCacheBeforeSettingValue = false;
     private boolean hashKeyPrefix = true;
     private Duration waitForRemove = Duration.ZERO;
+    private MetricRecorder metricRecorder = new NoOpMetricRecorder();
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -63,7 +65,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                staleMaxCapacity,staleCacheMemachedGetTimeout,
                removeFutureFromInternalCacheBeforeSettingValue,
                hashKeyPrefix,
-               waitForRemove);
+               waitForRemove,
+               metricRecorder);
     }
 
     public T setWaitForRemove(Duration durationToWaitFor) {
@@ -194,5 +197,11 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     public T setHashKeyPrefix(boolean hashKeyPrefix) {
         this.hashKeyPrefix = hashKeyPrefix;
         return self();
+    }
+
+    public T setMetricsRecorder(MetricRecorder metricsRecorder) {
+        this.metricRecorder = metricsRecorder;
+        return self();
+
     }
 }

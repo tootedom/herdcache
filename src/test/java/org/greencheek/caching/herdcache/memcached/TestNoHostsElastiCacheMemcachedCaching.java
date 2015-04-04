@@ -213,6 +213,11 @@ public class TestNoHostsElastiCacheMemcachedCaching {
 
         assertEquals("Value should be key1", "New Value", cache.awaitForFutureOrElse(passThrough, null));
 
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         ListenableFuture<String> val6 = cache.apply("Key1", () -> {
             return "G";

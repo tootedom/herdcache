@@ -25,6 +25,8 @@ package org.greencheek.caching.herdcache.memcached.spy.extensions;
 import net.spy.memcached.CachedData;
 import net.spy.memcached.transcoders.Transcoder;
 import net.spy.memcached.transcoders.TranscoderUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 
@@ -33,6 +35,8 @@ import java.util.Date;
  */
 public class SerializingTranscoder extends BaseSerializingTranscoder implements
         Transcoder<Object> {
+
+  private static final Logger logger = LoggerFactory.getLogger(SerializingTranscoder.class);
 
   public static final int MAX_CONTENT_SIZE_IN_BYTES = CachedData.MAX_SIZE;
   // General flags
@@ -119,7 +123,7 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
         rv = data;
         break;
       default:
-        getLogger().warn("Undecodeable with flags %x", flags);
+        logger.warn("Undecodeable with flags {}", flags);
       }
     } else {
       rv = decodeString(data);
@@ -137,9 +141,6 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
     int flags = 0;
     if (o instanceof String) {
       b = encodeString((String) o);
-//      if (StringUtils.isJsonObject((String) o)) {
-//        return new CachedData(flags, b, getMaxSize());
-//      }
     } else if (o instanceof Long) {
       b = tu.encodeLong((Long) o);
       flags |= SPECIAL_LONG;
@@ -172,12 +173,12 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
     if (b.length > compressionThreshold) {
       byte[] compressed = compress(b);
       if (compressed.length < b.length) {
-        getLogger().debug("Compressed %s from %d to %d",
+        logger.debug("Compressed {} from {} to {}",
             o.getClass().getName(), b.length, compressed.length);
         b = compressed;
         flags |= COMPRESSED;
       } else {
-        getLogger().info("Compression increased the size of %s from %d to %d",
+        logger.info("Compression increased the size of {} from {} to {}",
             o.getClass().getName(), b.length, compressed.length);
       }
     }

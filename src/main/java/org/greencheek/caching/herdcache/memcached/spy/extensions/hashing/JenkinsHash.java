@@ -25,6 +25,7 @@ public class JenkinsHash implements HashAlgorithm {
             // the hash variable in the original C code is a uint32.
             // convert the java signed int to an "unsigned",
             // represented via a long:
+            /* Convert to unsigned 32-bits */
             return hash & 0xFFFFFFFFl;
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException("Hash function error", e);

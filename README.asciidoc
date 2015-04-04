@@ -697,6 +697,47 @@ Stale Caching is available in both `SpyMemcachedCache` and `ElastiCacheMemcached
 
 '''
 
+==== Metrics
+
+Metric are available in both `SpyMemcachedCache` and `ElastiCacheMemcachedCache`
+as of version `1.0.11`.  The configuration builder takes an option `.setMetricsRecorder(..)'
+This takes an implementation of org.greencheek.caching.herdcache.memcached.metrics.MetricsRecorder.  The default
+implementation being a `NoOpMetricRecorder`.  The other implementation is that of the `new YammerMetricsRecorder(registry)`
+which uses the yammer metrics library (https://dropwizard.github.io/metrics).
+
+With the YammerMetricsRecorder the following metrics are placed inside the Metrics library:
+
+[width="25%",options="header"]
+|=========================================
+|Method          | Description |
+|value_calculation_cache_hitrate | The cache hits per second on the internal future cache |
+|value_calculation_cache_missrate| The cache misses per second on the internal future cache |
+|value_calculation_cache_hitcount| The cache hits in total on the internal future cache |
+|value_calculation_cache_misscount| The cache misses in total on the internal future cache |
+|value_calculation_success_count | The number of successful runs of the Supplier<T> function |
+|value_calculation_failure_count | The number of failed runs of the Supplier<T> function |
+|value_calculation_time_timer | The time it has taken to execute the Supplier<T> function |
+|distributed_cache_hitrate| The cache hits per second on the distributed cache (i.e. memcached) |
+|distributed_cache_missrate| The cache misses per second on the distributed cache (i.e. memcached) |
+|distributed_cache_timer| The time it takes to lookup a value from the distributed cache |
+|distributed_cache_count | The number of lookups in the distributed cache that have been performed|
+|distributed_cache_hitcount | The cache hits in total on the distributed cache|
+|distributed_cache_misscount  | The cache misses in total on the distributed cache|
+|distributed_cache_writes_count| The writes performed on the distributed cache|
+|stale_distributed_cache_timer|The time it takes to lookup a stale value from the distributed cache |
+|stale_distributed_cache_hitrate| The stale cache hits per second on the distributed cache (i.e. memcached) |
+|stale_distributed_cache_missrate| The stale cache misses per second on the distributed cache (i.e. memcached) |
+|stale_distributed_cache_count| The stale hits performed on the distributed cache (i.e. memcached) |
+|stale_distributed_cache_hitcount|  The stale cache hits in total on the distributed cache|
+|stale_distributed_cache_misscount|  The stale cache misses in total on the distributed cache|
+|stale_value_calculation_cache_misscount | The cache misses in total on the internal future cache for a stale value|
+|stale_value_calculation_cache_hitcount  | The cache hits in total on the internal future cache for a stale value|
+|stale_value_calculation_cache_missrate| The cache misses per second on the internal future cache for stale value |
+|stale_value_calculation_cache_hitrate|  The cache hits per second on the internal future cache for stale value |
+|=========================================================
+
+
+
 
 === `ElastiCacheMemcachedCache` (AWS ElastiCache Support)
 
@@ -1032,4 +1073,16 @@ public class ElastiCacheTest {
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
+----
+
+'''
+
+=== Internal Notes
+
+To compile and run perf tests do:
+
+[source,text]
+----
+mvn clean test-compile assembly:single
+$JAVA_HOME/bin/java -jar target/performancetests-test-jar-with-dependencies.jar
 ----

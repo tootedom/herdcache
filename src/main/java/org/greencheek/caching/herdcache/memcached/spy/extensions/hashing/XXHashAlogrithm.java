@@ -3,6 +3,8 @@ package org.greencheek.caching.herdcache.memcached.spy.extensions.hashing;
 import net.jpountz.xxhash.XXHashFactory;
 import net.spy.memcached.HashAlgorithm;
 
+import java.io.UnsupportedEncodingException;
+
 /**
  * Created by dominictootell on 28/05/2014.
  */
@@ -11,7 +13,11 @@ public class XXHashAlogrithm implements HashAlgorithm {
 
     @Override
     public long hash(String k) {
-        byte[] b = k.getBytes();
-        return factory.hash32().hash(b,0,b.length,0) & 0xFFFFFFFFl;
+        try {
+            byte[] b = k.getBytes("UTF-8");
+            return factory.hash32().hash(b, 0, b.length, 0) & 0xFFFFFFFFl;
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("Hash function error", e);
+        }
     }
 }

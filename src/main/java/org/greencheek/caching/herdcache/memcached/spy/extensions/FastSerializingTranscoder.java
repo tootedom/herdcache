@@ -4,6 +4,8 @@ import de.ruedigermoeller.serialization.FSTConfiguration;
 import de.ruedigermoeller.serialization.FSTObjectInput;
 import de.ruedigermoeller.serialization.FSTObjectOutput;
 import net.spy.memcached.CachedData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -11,6 +13,7 @@ import java.io.IOException;
  * Uses https://github.com/RuedigerMoeller/fast-serialization for serialization
  */
 public class FastSerializingTranscoder extends SerializingTranscoder {
+    private static final Logger logger = LoggerFactory.getLogger(FastSerializingTranscoder.class);
     public static final boolean DEFAULT_SHARE_REFERENCES = true;
     public static final int DEFAULT_COMPRESSION_THRESHOLD = 4096;
     public static final int MAX_CONTENT_SIZE_IN_BYTES = CachedData.MAX_SIZE;
@@ -57,10 +60,10 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
                 rv = is.readObject();
             }
         } catch (IOException e) {
-            getLogger().warn("Caught IOException decoding %d bytes of data",
+            logger.warn("Caught IOException decoding {} bytes of data",
                     in == null ? 0 : in.length, e);
         } catch (ClassNotFoundException e) {
-            getLogger().warn("Caught CNFE decoding %d bytes of data",
+            logger.warn("Caught CNFE decoding {} bytes of data",
                     in == null ? 0 : in.length, e);
         }
         return rv;
