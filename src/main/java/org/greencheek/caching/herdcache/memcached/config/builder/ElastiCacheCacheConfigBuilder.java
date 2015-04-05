@@ -3,9 +3,11 @@ package org.greencheek.caching.herdcache.memcached.config.builder;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
+import org.greencheek.caching.herdcache.memcached.config.MemcachedClientType;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ClientClusterUpdateObserver;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheConfigServerUpdater;
 
+import java.nio.charset.Charset;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +30,13 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
     private List<ClientClusterUpdateObserver> clusterUpdatedObservers = new ArrayList<>();
     private Optional<ElastiCacheConfigServerUpdater> configUrlUpdater = Optional.empty();
     private boolean updateConfigOnlyOnVersionChange = false;
+    private MemcachedClientType memcachedClientType = MemcachedClientType.SPY;
+    private boolean useFolsomStringClient = false;
+    Charset folsomCharset = Charset.forName("UTF-8");
+    int folsomConnections = 10;
+    long folsomRequestTimeout = 3000;
+    int folsomMaxOutstandingRequests = 1000;
+
 
     public ElastiCacheCacheConfigBuilder setElastiCacheConfigHosts(String urls) {
         this.elastiCacheConfigHosts = urls;
@@ -89,6 +98,36 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
         return self();
     }
 
+    public ElastiCacheCacheConfigBuilder setMemcachedClientType(MemcachedClientType clientType) {
+        this.memcachedClientType = clientType;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setUseFolsomStringClient(boolean useStringClient) {
+        this.useFolsomStringClient = useStringClient;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setFolsomStringClientCharset(Charset charset) {
+        this.folsomCharset = charset;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setFolsomClientConnections(int connections) {
+        this.folsomConnections = connections;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setFolsomRequestTimeout(long timeout) {
+        this.folsomRequestTimeout = timeout;
+        return self();
+    }
+
+    public ElastiCacheCacheConfigBuilder setFolsomMaxOutstandingRequests(int maxRequests) {
+        this.folsomMaxOutstandingRequests = maxRequests;
+        return self();
+    }
+
     @Override
     public ElastiCacheCacheConfig buildElastiCacheMemcachedConfig() {
         return new ElastiCacheCacheConfig(buildMemcachedConfig(),
@@ -103,7 +142,13 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
                 updateConfigVersionOnDnsTimeout,
                 clusterUpdatedObservers,
                 configUrlUpdater,
-                updateConfigOnlyOnVersionChange
+                updateConfigOnlyOnVersionChange,
+                memcachedClientType,
+                useFolsomStringClient,
+                folsomCharset,
+                folsomConnections,
+                folsomRequestTimeout,
+                folsomMaxOutstandingRequests
         );
 
     }
@@ -113,8 +158,6 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
         return super.buildMemcachedConfig();
     }
 
-    @Override
-    public ConnectionFactory createMemcachedConnectionFactory() {
-        return null;
-    }
+
+
 }

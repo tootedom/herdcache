@@ -134,6 +134,11 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>com.spotify</groupId>
+            <artifactId>folsom</artifactId>
+            <version>0.6.1</version>
+        </dependency>
+        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty</artifactId>
             <version>3.9.2.Final</version>

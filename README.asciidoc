@@ -709,33 +709,34 @@ With the YammerMetricsRecorder the following metrics are placed inside the Metri
 
 [width="25%",options="header"]
 |=========================================
-|Method          | Description |
-|value_calculation_cache_hitrate | The cache hits per second on the internal future cache |
-|value_calculation_cache_missrate| The cache misses per second on the internal future cache |
-|value_calculation_cache_hitcount| The cache hits in total on the internal future cache |
-|value_calculation_cache_misscount| The cache misses in total on the internal future cache |
-|value_calculation_success_count | The number of successful runs of the Supplier<T> function |
-|value_calculation_failure_count | The number of failed runs of the Supplier<T> function |
-|value_calculation_time_timer | The time it has taken to execute the Supplier<T> function |
-|distributed_cache_hitrate| The cache hits per second on the distributed cache (i.e. memcached) |
-|distributed_cache_missrate| The cache misses per second on the distributed cache (i.e. memcached) |
-|distributed_cache_timer| The time it takes to lookup a value from the distributed cache |
-|distributed_cache_count | The number of lookups in the distributed cache that have been performed|
-|distributed_cache_hitcount | The cache hits in total on the distributed cache|
-|distributed_cache_misscount  | The cache misses in total on the distributed cache|
-|distributed_cache_writes_count| The writes performed on the distributed cache|
-|stale_distributed_cache_timer|The time it takes to lookup a stale value from the distributed cache |
-|stale_distributed_cache_hitrate| The stale cache hits per second on the distributed cache (i.e. memcached) |
-|stale_distributed_cache_missrate| The stale cache misses per second on the distributed cache (i.e. memcached) |
-|stale_distributed_cache_count| The stale hits performed on the distributed cache (i.e. memcached) |
-|stale_distributed_cache_hitcount|  The stale cache hits in total on the distributed cache|
-|stale_distributed_cache_misscount|  The stale cache misses in total on the distributed cache|
-|stale_value_calculation_cache_misscount | The cache misses in total on the internal future cache for a stale value|
-|stale_value_calculation_cache_hitcount  | The cache hits in total on the internal future cache for a stale value|
-|stale_value_calculation_cache_missrate| The cache misses per second on the internal future cache for stale value |
-|stale_value_calculation_cache_hitrate|  The cache hits per second on the internal future cache for stale value |
+|Method          | Description
+|value_calculation_cache_hitrate | The cache hits per second on the internal future cache
+|value_calculation_cache_missrate | The cache misses per second on the internal future cache
+|value_calculation_cache_hitcount | The cache hits in total on the internal future cache
+|value_calculation_cache_misscount | The cache misses in total on the internal future cache
+|value_calculation_success_count | The number of successful runs of the Supplier<T> function
+|value_calculation_failure_count | The number of failed runs of the Supplier<T> function
+|value_calculation_time_timer | The time it has taken to execute the Supplier<T> function
+|distributed_cache_hitrate | The cache hits per second on the distributed cache (i.e. memcached)
+|distributed_cache_missrate | The cache misses per second on the distributed cache (i.e. memcached)
+|distributed_cache_timer | The time it takes to lookup a value from the distributed cache
+|distributed_cache_count | The number of lookups in the distributed cache that have been performed
+|distributed_cache_hitcount | The cache hits in total on the distributed cache
+|distributed_cache_misscount | The cache misses in total on the distributed cache
+|distributed_cache_writes_count | The writes performed on the distributed cache
+|stale_distributed_cache_timer | The time it takes to lookup a stale value from the distributed cache
+|stale_distributed_cache_hitrate | The stale cache hits per second on the distributed cache (i.e. memcached)
+|stale_distributed_cache_missrate | The stale cache misses per second on the distributed cache (i.e. memcached)
+|stale_distributed_cache_count | The stale hits performed on the distributed cache (i.e. memcached)
+|stale_distributed_cache_hitcount | The stale cache hits in total on the distributed cache
+|stale_distributed_cache_misscount | The stale cache misses in total on the distributed cache
+|stale_value_calculation_cache_misscount | The cache misses in total on the internal future cache for a stale value
+|stale_value_calculation_cache_hitcount  | The cache hits in total on the internal future cache for a stale value
+|stale_value_calculation_cache_missrate | The cache misses per second on the internal future cache for stale value
+|stale_value_calculation_cache_hitrate | The cache hits per second on the internal future cache for stale value
 |=========================================================
 
+'''
 
 
 
@@ -1085,4 +1086,16 @@ To compile and run perf tests do:
 ----
 mvn clean test-compile assembly:single
 $JAVA_HOME/bin/java -jar target/performancetests-test-jar-with-dependencies.jar
+
+Example output:
+
+Benchmark                                                                        Mode  Cnt    Score   Error   Units
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest  thrpt   60   21.335 ± 1.396  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTest                 thrpt   60   21.315 ± 0.706  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTest        thrpt   60   21.194 ± 0.873  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTest             thrpt   60   20.755 ± 0.340  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                            thrpt   60   57.897 ± 1.095  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                          thrpt   60  123.656 ± 2.166  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                           thrpt   60   81.231 ± 1.841  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                         thrpt   60  136.641 ± 3.344  ops/ms
 ----

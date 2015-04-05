@@ -1,40 +1,22 @@
 package org.greencheek.caching.herdcache.memcached.factory;
 
-import net.spy.memcached.MemcachedClientIF;
-
 import java.net.InetSocketAddress;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Created by dominictootell on 26/08/2014.
+ * Created by dominictootell on 05/04/2015.
  */
-public class ReferencedClient {
+public interface ReferencedClient<V> {
 
-    public static final ReferencedClient UNAVAILABLE_REFERENCE_CLIENT = new ReferencedClient(false, Collections.<InetSocketAddress>emptyList(),null);
+    boolean isAvailable();
+    List<InetSocketAddress> getResolvedHosts();
 
-    private final boolean isAvailable;
-    private final List<InetSocketAddress> resolvedHosts;
-    private final MemcachedClientIF client;
+    V get(String key, long time,TimeUnit unit);
+    Future set(String key, int ttlInSeconds, V value);
+    Future delete(String key);
+    Future flush();
 
-
-    public ReferencedClient(boolean isAvailable,
-                            List<InetSocketAddress> resolvedHosts,
-                            MemcachedClientIF client) {
-        this.isAvailable = isAvailable;
-        this.resolvedHosts = resolvedHosts;
-        this.client = client;
-    }
-
-    public boolean isAvailable() {
-        return isAvailable;
-    }
-
-    public List<InetSocketAddress> getResolvedHosts() {
-        return resolvedHosts;
-    }
-
-    public MemcachedClientIF getClient() {
-        return client;
-    }
+    void shutdown();
 }

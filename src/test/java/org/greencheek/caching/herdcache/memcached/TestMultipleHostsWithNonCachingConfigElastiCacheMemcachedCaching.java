@@ -77,6 +77,27 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         executorService.shutdownNow();
     }
 
+    ElastiCacheMemcachedCache<String> createCache(int configServerPort,HashAlgorithm algo,ClientClusterUpdateObserver observer) {
+        return new ElastiCacheMemcachedCache<String>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setElastiCacheConfigHosts("localhost:" + configServerPort)
+                        .setConfigPollingTime(Duration.ofSeconds(9))
+                        .setInitialConfigPollingDelay(Duration.ofSeconds(0))
+                        .setTimeToLive(Duration.ofSeconds(2))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setSetWaitDuration(Duration.ofSeconds(10))
+                        .setHashAlgorithm(algo)
+                        .setDelayBeforeClientClose(Duration.ofSeconds(1))
+                        .setDnsConnectionTimeout(Duration.ofSeconds(2))
+                        .setUseStaleCache(true)
+                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+                        .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
+                        .addElastiCacheClientClusterUpdateObserver(observer)
+                        .buildElastiCacheMemcachedConfig()
+        );
+    }
+
     private void testStaleCaching(CacheWithExpiry cache) {
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -198,24 +219,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         };
 
         try {
-            cache = new ElastiCacheMemcachedCache<String>(
-                    new ElastiCacheCacheConfigBuilder()
-                            .setElastiCacheConfigHosts("localhost:" + server.getPort())
-                            .setConfigPollingTime(Duration.ofSeconds(9))
-                            .setInitialConfigPollingDelay(Duration.ofSeconds(0))
-                            .setTimeToLive(Duration.ofSeconds(2))
-                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                            .setWaitForMemcachedSet(true)
-                            .setSetWaitDuration(Duration.ofSeconds(10))
-                            .setHashAlgorithm(algo)
-                            .setDelayBeforeClientClose(Duration.ofSeconds(1))
-                            .setDnsConnectionTimeout(Duration.ofSeconds(2))
-                            .setUseStaleCache(true)
-                            .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                            .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
-                            .addElastiCacheClientClusterUpdateObserver(observer)
-                            .buildElastiCacheMemcachedConfig()
-            );
+            cache = createCache(server.getPort(),algo,observer);
 
 
             assertTrue(waitOnInt(latch));
@@ -226,6 +230,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                memcached1.getDaemon().getCache().flush_all();
+                memcached2.getDaemon().getCache().flush_all();
             }
 
             assertTrue(waitOnInt(latch));
@@ -237,6 +243,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                memcached1.getDaemon().getCache().flush_all();
+                memcached2.getDaemon().getCache().flush_all();
             }
 
             assertTrue(waitOnInt(latch));
@@ -248,6 +256,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                memcached1.getDaemon().getCache().flush_all();
+                memcached2.getDaemon().getCache().flush_all();
             }
 
             assertTrue(waitOnInt(latch));
@@ -259,6 +269,8 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
             if(cache instanceof ClearableCache) {
                 ((ClearableCache)cache).clear(true);
+                memcached1.getDaemon().getCache().flush_all();
+                memcached2.getDaemon().getCache().flush_all();
             }
 
 

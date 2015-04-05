@@ -30,10 +30,19 @@ import static org.junit.Assert.assertTrue;
 public class TestStaleMemcachedCaching {
     private MemcachedDaemonWrapper memcached;
     private ListeningExecutorService executorService;
-    private CacheWithExpiry<String> cache;
+    CacheWithExpiry<String> cache;
+    MetricRegistry registry;
+    private ConsoleReporter reporter;
+
 
     @Before
     public void setUp() {
+        registry = new MetricRegistry();
+        reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+
         executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
 
         memcached = MemcachedDaemonFactory.createMemcachedDaemon(false);
@@ -42,7 +51,30 @@ public class TestStaleMemcachedCaching {
             throw new RuntimeException("Unable to start local memcached");
         }
 
+        cache = createCache(memcached.getPort());
 
+
+    }
+
+    CacheWithExpiry<String> createCache(int port) {
+        if(cache!=null) {
+            ((RequiresShutdown)cache).shutdown();
+        }
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + port)
+                        .setTimeToLive(Duration.ofSeconds(1))
+                        .setUseStaleCache(true)
+                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setStaleCachePrefix("staleprefix")
+                        .setWaitForMemcachedSet(true)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+                        .buildMemcachedConfig()
+        );
+
+        return cache;
     }
 
     @After
@@ -54,28 +86,33 @@ public class TestStaleMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        reporter.close();
     }
+
+
+
 
     @Test
     public void testMemcachedCache() throws InterruptedException {
-        MetricRegistry registry = new MetricRegistry();
-        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
-                .convertRatesTo(TimeUnit.SECONDS)
-                .convertDurationsTo(TimeUnit.MILLISECONDS)
-                .build();
-
-        cache = new SpyMemcachedCache<>(
-                new ElastiCacheCacheConfigBuilder()
-                        .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setTimeToLive(Duration.ofSeconds(1))
-                        .setUseStaleCache(true)
-                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setStaleCachePrefix("staleprefix")
-                        .setWaitForMemcachedSet(true)
-                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
-                        .buildMemcachedConfig()
-        );
+//        MetricRegistry registry = new MetricRegistry();
+//        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+//                .convertRatesTo(TimeUnit.SECONDS)
+//                .convertDurationsTo(TimeUnit.MILLISECONDS)
+//                .build();
+//
+//        cache = new SpyMemcachedCache<>(
+//                new ElastiCacheCacheConfigBuilder()
+//                        .setMemcachedHosts("localhost:" + memcached.getPort())
+//                        .setTimeToLive(Duration.ofSeconds(1))
+//                        .setUseStaleCache(true)
+//                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+//                        .setStaleCachePrefix("staleprefix")
+//                        .setWaitForMemcachedSet(true)
+//                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+//                        .buildMemcachedConfig()
+//        );
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -123,16 +160,7 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testMemcachedCacheFunctionsWhenHostsNotAvailable() throws InterruptedException {
 
-        cache = new SpyMemcachedCache<>(
-                new ElastiCacheCacheConfigBuilder()
-                        .setMemcachedHosts("localhost:11111")
-                        .setTimeToLive(Duration.ofSeconds(1))
-                        .setUseStaleCache(true)
-                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setWaitForMemcachedSet(true)
-                        .buildMemcachedConfig()
-        );
+        cache = createCache(11111);
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -176,17 +204,17 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testStaleMemcachedCacheWithRemove() throws InterruptedException {
 
-        cache = new SpyMemcachedCache<>(
-                new ElastiCacheCacheConfigBuilder()
-                        .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setTimeToLive(Duration.ofSeconds(1))
-                        .setUseStaleCache(true)
-                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setWaitForMemcachedSet(true)
-                        .setKeyHashType(KeyHashingType.NONE)
-                        .buildMemcachedConfig()
-        );
+//        cache = new SpyMemcachedCache<>(
+//                new ElastiCacheCacheConfigBuilder()
+//                        .setMemcachedHosts("localhost:" + memcached.getPort())
+//                        .setTimeToLive(Duration.ofSeconds(1))
+//                        .setUseStaleCache(true)
+//                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+//                        .setWaitForMemcachedSet(true)
+//                        .setKeyHashType(KeyHashingType.NONE)
+//                        .buildMemcachedConfig()
+//        );
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -300,17 +328,17 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testStaleMemcachedCache() throws InterruptedException {
 
-        cache = new SpyMemcachedCache<>(
-                new ElastiCacheCacheConfigBuilder()
-                        .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setTimeToLive(Duration.ofSeconds(1))
-                        .setUseStaleCache(true)
-                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setWaitForMemcachedSet(true)
-                        .setKeyHashType(KeyHashingType.NONE)
-                        .buildMemcachedConfig()
-        );
+//        cache = new SpyMemcachedCache<>(
+//                new ElastiCacheCacheConfigBuilder()
+//                        .setMemcachedHosts("localhost:" + memcached.getPort())
+//                        .setTimeToLive(Duration.ofSeconds(1))
+//                        .setUseStaleCache(true)
+//                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+//                        .setWaitForMemcachedSet(true)
+//                        .setKeyHashType(KeyHashingType.NONE)
+//                        .buildMemcachedConfig()
+//        );
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -448,17 +476,17 @@ public class TestStaleMemcachedCaching {
     @Test
     public void testStaleMemcachedCacheWithNoSuchItems() throws InterruptedException {
 
-        cache = new SpyMemcachedCache<>(
-                new ElastiCacheCacheConfigBuilder()
-                        .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setTimeToLive(Duration.ofSeconds(1))
-                        .setUseStaleCache(true)
-                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
-                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setWaitForMemcachedSet(true)
-                        .setKeyHashType(KeyHashingType.NONE)
-                        .buildMemcachedConfig()
-        );
+//        cache = new SpyMemcachedCache<>(
+//                new ElastiCacheCacheConfigBuilder()
+//                        .setMemcachedHosts("localhost:" + memcached.getPort())
+//                        .setTimeToLive(Duration.ofSeconds(1))
+//                        .setUseStaleCache(true)
+//                        .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
+//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+//                        .setWaitForMemcachedSet(true)
+//                        .setKeyHashType(KeyHashingType.NONE)
+//                        .buildMemcachedConfig()
+//        );
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {

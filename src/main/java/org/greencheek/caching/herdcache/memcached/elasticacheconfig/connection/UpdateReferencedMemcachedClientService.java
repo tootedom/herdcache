@@ -19,6 +19,8 @@ import org.greencheek.caching.herdcache.memcached.config.Host;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.domain.ElastiCacheHost;
 import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClientFactory;
+import org.greencheek.caching.herdcache.memcached.factory.SpyReferencedClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,18 +31,18 @@ public class UpdateReferencedMemcachedClientService implements UpdateClientServi
 
     private final HostResolver dnsLookupService;
     private final Duration dnsConnectionTimeout;
-    private final ConnectionFactory memcachedConnectionFactory;
+    private final ReferencedClientFactory memcachedConnectionFactory;
     private final Duration delayBeforeOldClientClose;
 
     private final static Logger logger = LoggerFactory.getLogger(UpdateReferencedMemcachedClientService.class);
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-    private volatile ReferencedClient referencedClient = ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+    private volatile ReferencedClient referencedClient = SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
 
     public UpdateReferencedMemcachedClientService(HostResolver dnsLookupService,
                                                   Duration dnsConnectionTimeout,
-                                                  ConnectionFactory memcachedConnectionFactory,
+                                                  ReferencedClientFactory memcachedConnectionFactory,
                                                   Duration delayBeforeOldClientClose) {
 
         this.dnsConnectionTimeout = dnsConnectionTimeout;
@@ -60,18 +62,18 @@ public class UpdateReferencedMemcachedClientService implements UpdateClientServi
         ReferencedClient currentClient = referencedClient;
         if (hosts.size() == 0) {
             logger.warn("No cache hosts available.  Marking cache as disabled.");
-            referencedClient = ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
-            return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+            referencedClient = SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+            return SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
         } else {
             List<InetSocketAddress> resolvedHosts = getSocketAddresses(hosts);
             if (resolvedHosts.size() == 0) {
                 logger.warn("No resolvable cache hosts available.  Marking cache as disabled.");
-                referencedClient = ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
-                return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+                referencedClient = SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+                return SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
             } else {
                 logger.info("New client being created for new cache hosts.");
                 try {
-                    ReferencedClient newClient = new ReferencedClient(true, resolvedHosts, new MemcachedClient(memcachedConnectionFactory, resolvedHosts));
+                    ReferencedClient newClient = memcachedConnectionFactory.createClient(resolvedHosts);
 
                     referencedClient = newClient;
                     if (currentClient.isAvailable()) {
@@ -80,7 +82,7 @@ public class UpdateReferencedMemcachedClientService implements UpdateClientServi
                             @Override
                             public void run() {
                                 logger.info("Shutting down old cache client.");
-                                currentClient.getClient().shutdown();
+                                currentClient.shutdown();
                             }
                         }, delayBeforeOldClientClose.toMillis(), TimeUnit.MILLISECONDS);
                     }
@@ -91,10 +93,10 @@ public class UpdateReferencedMemcachedClientService implements UpdateClientServi
                         shutdown();
                     }
                     return newClient;
-                } catch (IOException e) {
-                    logger.warn("Unable to create new MemcachedClient. No resolvable cache hosts available.  Marking cache as disabled.");
-                    referencedClient = ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
-                    return ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+                } catch (Exception e) {
+                    logger.warn("Unable to create new MemcachedClient, exception during client creation.  Marking cache as disabled.",e);
+                    referencedClient = SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+                    return SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
                 }
             }
         }
@@ -114,9 +116,9 @@ public class UpdateReferencedMemcachedClientService implements UpdateClientServi
         if (currentClient.isAvailable()) {
             try {
                 scheduledExecutor.shutdown();
-                currentClient.getClient().shutdown();
+                currentClient.shutdown();
             } finally {
-                referencedClient = ReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
+                referencedClient = SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
             }
         }
     }

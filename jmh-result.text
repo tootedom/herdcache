@@ -1,0 +1,9 @@
+Benchmark                                                                        Mode  Cnt    Score   Error   Units
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest  thrpt   60   21.335 ± 1.396  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTest                 thrpt   60   21.315 ± 0.706  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTest        thrpt   60   21.194 ± 0.873  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTest             thrpt   60   20.755 ± 0.340  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                            thrpt   60   57.897 ± 1.095  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                          thrpt   60  123.656 ± 2.166  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                           thrpt   60   81.231 ± 1.841  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                         thrpt   60  136.641 ± 3.344  ops/ms

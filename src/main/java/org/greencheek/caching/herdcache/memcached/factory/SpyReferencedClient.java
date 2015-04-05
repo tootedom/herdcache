@@ -1,0 +1,89 @@
+package org.greencheek.caching.herdcache.memcached.factory;
+
+import net.spy.memcached.MemcachedClientIF;
+import net.spy.memcached.OperationTimeoutException;
+import net.spy.memcached.internal.CheckedOperationTimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ *
+ */
+public class SpyReferencedClient<V> implements ReferencedClient<V> {
+
+    private static final Logger logger = LoggerFactory.getLogger(SpyReferencedClient.class);
+    public static final ReferencedClient UNAVAILABLE_REFERENCE_CLIENT = new SpyReferencedClient(false, Collections.<InetSocketAddress>emptyList(),null);
+
+    private final boolean isAvailable;
+    private final List<InetSocketAddress> resolvedHosts;
+    private final MemcachedClientIF client;
+
+
+    public SpyReferencedClient(boolean isAvailable,
+                               List<InetSocketAddress> resolvedHosts,
+                               MemcachedClientIF client) {
+        this.isAvailable = isAvailable;
+        this.resolvedHosts = resolvedHosts;
+        this.client = client;
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return isAvailable;
+    }
+
+    @Override
+    public List<InetSocketAddress> getResolvedHosts() {
+        return resolvedHosts;
+    }
+
+    @Override
+    public V get(String key, long timeout, TimeUnit unit) {
+        V value = null;
+        try {
+            Future<Object> future =  client.asyncGet(key);
+            value = (V)future.get(timeout,unit);
+        } catch ( OperationTimeoutException | CheckedOperationTimeoutException e) {
+            logger.warn("timeout when retrieving key {} from memcached",key);
+        } catch (TimeoutException e) {
+            logger.warn("timeout when retrieving key {} from memcached", key);
+        } catch(Exception e) {
+            logger.warn("Unable to contact memcached for get({}): {}", key, e.getMessage());
+        } catch(Throwable e) {
+            logger.warn("Exception thrown when communicating with memcached for get({}): {}", key, e.getMessage());
+        }
+        return value;
+    }
+
+    @Override
+    public Future set(String key, int entryTTLInSeconds, V value) {
+        return client.set(key, entryTTLInSeconds, value);
+    }
+
+    @Override
+    public Future delete(String key) {
+        return client.delete(key);
+    }
+
+    @Override
+    public Future flush() {
+        return client.flush();
+    }
+
+    @Override
+    public void shutdown() {
+       client.shutdown();
+    }
+
+//    @Override
+//    public MemcachedClientIF getClient() {
+//        return client;
+//    }
+}

@@ -9,6 +9,7 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.Elast
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.LocalhostElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.factory.ElastiCacheClientFactory;
+import org.greencheek.caching.herdcache.memcached.factory.ReferencedClientFactory;
 
 import java.util.List;
 
@@ -24,7 +25,7 @@ public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
 
     private ElastiCacheMemcachedCache(MemcachedCacheConfig mConfig,ElastiCacheCacheConfig config) {
         super(new ElastiCacheClientFactory(
-             createMemcachedConnectionFactory(mConfig),
+                createReferenceClientFactory(config),
                 ElastiCacheConfigHostsParser.parseElastiCacheConfigHosts(config.getElastiCacheConfigHosts()),
                 config.getConfigPollingTime(),
                 config.getInitialConfigPollingDelay(),
@@ -41,6 +42,8 @@ public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
                 config.isUpdateConfigOnlyOnVersionChange()
         ),mConfig);
     }
+
+
 
 
 }

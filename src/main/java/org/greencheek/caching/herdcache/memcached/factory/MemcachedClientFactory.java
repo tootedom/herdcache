@@ -1,7 +1,5 @@
 package org.greencheek.caching.herdcache.memcached.factory;
 
-import net.spy.memcached.MemcachedClientIF;
-
 /**
  *
  */

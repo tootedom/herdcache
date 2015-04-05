@@ -3,16 +3,13 @@ package org.greencheek.caching.herdcache.memcached;
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.MemcachedClientIF;
-import net.spy.memcached.OperationTimeoutException;
-import net.spy.memcached.internal.CheckedOperationTimeoutException;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationCompleteNotifier;
 import org.greencheek.caching.herdcache.lru.CacheValueComputationFailureHandler;
+import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
-import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
-import org.greencheek.caching.herdcache.memcached.factory.ReferencedClient;
+import org.greencheek.caching.herdcache.memcached.factory.*;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
@@ -38,6 +35,17 @@ import java.util.function.Supplier;
                 config.getHashingType(), config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
                 config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType());
+    }
+
+    public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {
+        switch(config.getClientType()) {
+            case SPY:
+                return new SpyMemcachedReferencedClientFactory<>(createMemcachedConnectionFactory(config.getMemcachedCacheConfig()));
+            case FOLSOM:
+                return new FolsomReferencedClientFactory<>(config);
+            default:
+                return new SpyMemcachedReferencedClientFactory<>(createMemcachedConnectionFactory(config.getMemcachedCacheConfig()));
+        }
     }
 
     public static final String CACHE_TYPE_VALUE_CALCULATION = "value_calculation_cache";
@@ -191,7 +199,7 @@ import java.util.function.Supplier;
         int entryTTLInSeconds = (int)getDuration(timeToLive);
 
         if( waitForMemcachedSet ) {
-            Future<Boolean> futureSet = client.getClient().set(key, entryTTLInSeconds, value);
+            Future<Boolean> futureSet = client.set(key, entryTTLInSeconds, value);
             try {
                 futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
@@ -199,7 +207,7 @@ import java.util.function.Supplier;
             }
         } else {
             try {
-                client.getClient().set(key, entryTTLInSeconds, value);
+                client.set(key, entryTTLInSeconds, value);
             } catch (Exception e) {
                 logger.warn("Exception waiting for memcached set to occur",e);
             }
@@ -523,18 +531,13 @@ import java.util.function.Supplier;
         Object serialisedObj = null;
         long nanos = System.nanoTime();
         try {
-            Future<Object> future =  client.getClient().asyncGet(key);
-            Object cacheVal = future.get(timeoutInMillis,TimeUnit.MILLISECONDS);
+            Object cacheVal = client.get(key,timeoutInMillis, TimeUnit.MILLISECONDS);
             if(cacheVal==null){
                 logCacheMiss(key,cacheType);
             } else {
                 logCacheHit(key,cacheType);
                 serialisedObj = cacheVal;
             }
-        } catch ( OperationTimeoutException | CheckedOperationTimeoutException e) {
-            logger.warn("timeout when retrieving key {} from memcached",key);
-        } catch (TimeoutException e) {
-            logger.warn("timeout when retrieving key {} from memcached", key);
         } catch(Exception e) {
             logger.warn("Unable to contact memcached for get({}): {}", key, e.getMessage());
         } catch(Throwable e) {
@@ -586,25 +589,23 @@ import java.util.function.Supplier;
     public void clear(boolean waitForClear) {
         clearInternalCaches();
         ReferencedClient client = clientFactory.getClient();
-        if(client.isAvailable()) {
-            MemcachedClientIF cli = client.getClient();
-            if(client!=null) {
-                Future<Boolean> future = cli.flush();
+        if (client.isAvailable()) {
+            Future<Boolean> future = client.flush();
+            if(future!=null) {
                 long millisToWait = config.getWaitForRemove().toMillis();
-                if(waitForClear || millisToWait>0) {
+                if (waitForClear || millisToWait > 0) {
                     try {
-                        if(millisToWait>0) {
-                            future.get(millisToWait,TimeUnit.MILLISECONDS);
-                        }
-                        else {
+                        if (millisToWait > 0) {
+                            future.get(millisToWait, TimeUnit.MILLISECONDS);
+                        } else {
                             future.get();
                         }
                     } catch (InterruptedException e) {
-                        logger.warn("Interrupted whilst waiting for cache clear to occur",e);
+                        logger.warn("Interrupted whilst waiting for cache clear to occur", e);
                     } catch (ExecutionException e) {
-                        logger.warn("Exception whilst waiting for cache clear to occur",e);
+                        logger.warn("Exception whilst waiting for cache clear to occur", e);
                     } catch (TimeoutException e) {
-                        logger.warn("Timeout whilst waiting for cache clear to occur",e);
+                        logger.warn("Timeout whilst waiting for cache clear to occur", e);
                     }
                 }
             }
@@ -637,15 +638,17 @@ import java.util.function.Supplier;
     @Override
     public void clear(String key) {
         ReferencedClient client = clientFactory.getClient();
-        if(client.isAvailable()) {
-            MemcachedClientIF cli = client.getClient();
-            if(client!=null) {
-                long millisToWait = config.getWaitForRemove().toMillis();
-                if(config.isUseStaleCache()) {
-                    Future<Boolean> staleCacheFuture = cli.delete(createStaleCacheKey(key));
+        if (client.isAvailable()) {
+            key = getHashedKey(key);
+            long millisToWait = config.getWaitForRemove().toMillis();
+            if (config.isUseStaleCache()) {
+                Future<Boolean> staleCacheFuture = client.delete(createStaleCacheKey(key));
+                if (staleCacheFuture != null) {
                     waitForDelete(staleCacheFuture, millisToWait, key, "stale cache");
                 }
-                Future<Boolean> future = cli.delete(key);
+            }
+            Future<Boolean> future = client.delete(key);
+            if (future != null) {
                 waitForDelete(future, millisToWait, key, "cache");
             }
         }

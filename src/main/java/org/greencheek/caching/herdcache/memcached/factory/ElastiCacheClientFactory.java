@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ElastiCacheClientFactory implements MemcachedClientFactory {
 
-    private final ConnectionFactory connnectionFactory;
+    private final ReferencedClientFactory connnectionFactory;
     private final ElastiCacheServerConnectionDetails[] elastiCacheConfigHosts;
     private final Duration configPollingTime;
     private final Duration initialConfigPollingDelay;
@@ -33,7 +33,7 @@ public class ElastiCacheClientFactory implements MemcachedClientFactory {
     private final UpdateClientService memcachedClientHolder;
     private final PeriodicConfigRetrievalClient configRetrievalClient;
 
-    public ElastiCacheClientFactory(ConnectionFactory connnectionFactory,
+    public ElastiCacheClientFactory(ReferencedClientFactory connnectionFactory,
                                     ElastiCacheServerConnectionDetails[] elastiCacheConfigHosts,
                                     Duration configPollingTime,
                                     Duration initialConfigPollingDelay,
