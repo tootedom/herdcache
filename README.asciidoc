@@ -708,7 +708,7 @@ which uses the yammer metrics library (https://dropwizard.github.io/metrics).
 With the YammerMetricsRecorder the following metrics are placed inside the Metrics library:
 
 [width="25%",options="header"]
-|=========================================
+|=========================================================
 |Method          | Description
 |value_calculation_cache_hitrate | The cache hits per second on the internal future cache
 |value_calculation_cache_missrate | The cache misses per second on the internal future cache
