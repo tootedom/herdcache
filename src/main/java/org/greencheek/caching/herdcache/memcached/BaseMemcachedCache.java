@@ -227,12 +227,12 @@ import java.util.function.Supplier;
                     new FutureCallback<V>() {
                         @Override
                         public void onSuccess(V result) {
-                            store.remove(key,toBeComputedFuture);
+                            store.remove(key);
                         }
 
                         @Override
                         public void onFailure(Throwable t) {
-                            store.remove(key,toBeComputedFuture);
+                            store.remove(key);
                         }
                     });
             return toBeComputedFuture;
@@ -253,7 +253,7 @@ import java.util.function.Supplier;
         ReferencedClient client = clientFactory.getClient();
         if(!client.isAvailable()) {
             warnCacheDisabled();
-            ListenableFuture<V> previousFuture = store.get(key);
+            ListenableFuture<V> previousFuture = store.get(keyString);
             if(previousFuture==null) {
                 logCacheMiss(keyString, CACHE_TYPE_CACHE_DISABLED);
                 return Futures.immediateCheckedFuture(null);
@@ -326,7 +326,6 @@ import java.util.function.Supplier;
             // create and store a new future for the to be generated value
             // first checking against local a cache to see if the computation is already
             // occurring
-
             ListenableFuture<V> existingFuture  = store.putIfAbsent(keyString, promise);
             //      val existingFuture : Future[Serializable] = store.get(keyString)
             if(existingFuture==null) {
@@ -336,21 +335,21 @@ import java.util.function.Supplier;
                 if(cachedObject == null)
                 {
                     logger.debug("set requested for {}", keyString);
-                    return cacheWriteFunction(client,computation, promise,
+                    cacheWriteFunction(client,computation, promise,
                             keyString, staleCacheKey,
                             timeToLive,staleCacheExpiry,executorService,
                             canCacheValueEvalutor);
                 }
                 else {
                     if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                        store.remove(keyString,promise);
+                        store.remove(keyString);
                         promise.set((V)cachedObject);
                     } else {
                         promise.set((V)cachedObject);
-                        store.remove(keyString, promise);
+                        store.remove(keyString);
                     }
-                    return promise;
                 }
+                return promise;
             }
             else  {
                 logCacheHit(keyString, CACHE_TYPE_VALUE_CALCULATION);
@@ -403,8 +402,8 @@ import java.util.function.Supplier;
      * @param backendFuture the future that is running the long returning calculation that creates a fresh entry.
      */
     private void getFromStaleDistributedCache(ReferencedClient client,
-                                              String key,
-                                              SettableFuture<V> promise,
+                                              final String key,
+                                              final SettableFuture<V> promise,
                                               ListenableFuture<V> backendFuture) {
 
         Object item = getFromDistributedCache(client,key,this.staleCacheMemachedGetTimeoutInMillis, CACHE_TYPE_STALE_CACHE);
@@ -414,11 +413,11 @@ import java.util.function.Supplier;
                         @Override
                         public void onSuccess(V result) {
                             if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                staleStore.remove(key, promise);
+                                staleStore.remove(key);
                                 promise.set(result);
                             } else {
                                 promise.set(result);
-                                staleStore.remove(key, promise);
+                                staleStore.remove(key);
                             }
 
                         }
@@ -426,22 +425,22 @@ import java.util.function.Supplier;
                         @Override
                         public void onFailure(Throwable t) {
                             if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                staleStore.remove(key, promise);
+                                staleStore.remove(key);
                                 promise.setException(t);
                             } else {
                                 promise.setException(t);
-                                staleStore.remove(key, promise);
+                                staleStore.remove(key);
                             }
                         }
                     });
 
         } else {
             if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                staleStore.remove(key,promise);
+                staleStore.remove(key);
                 promise.set((V)item);
             } else {
                 promise.set((V)item);
-                staleStore.remove(key, promise);
+                staleStore.remove(key);
             }
         }
 
@@ -458,7 +457,7 @@ import java.util.function.Supplier;
      * @param itemExpiry the expiry for the item
      * @return
      */
-    private ListenableFuture<V> cacheWriteFunction(ReferencedClient client,
+    private void cacheWriteFunction(ReferencedClient client,
                                                    Supplier<V> computation,
                                                    final SettableFuture<V> promise,
                                                    final String key, String staleCacheKey,
@@ -490,11 +489,11 @@ import java.util.function.Supplier;
                         } finally {
                             metricRecorder.incrementCounter("value_calculation_success");
                             if (config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                store.remove(key, promise);
+                                store.remove(key);
                                 promise.set(result);
                             } else {
                                 promise.set(result);
-                                store.remove(key, promise);
+                                store.remove(key);
                             }
                         }
                     }
@@ -504,15 +503,14 @@ import java.util.function.Supplier;
                         metricRecorder.incrementCounter("value_calculation_failure");
                         metricRecorder.setDuration("value_calculation",System.nanoTime()-startNanos);
                         if (config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                            store.remove(key, promise);
+                            store.remove(key);
                             promise.setException(t);
                         } else {
                             promise.setException(t);
-                            store.remove(key, promise);
+                            store.remove(key);
                         }
                     }
                 });
-        return promise;
     }
 
 
@@ -526,20 +524,18 @@ import java.util.function.Supplier;
      * @param cacheType The cache type.  This is output to the log when a hit or miss is logged
      * @return
      */
-    private V getFromDistributedCache(ReferencedClient client,String key, long timeoutInMillis,
+    private V getFromDistributedCache(ReferencedClient<V> client,String key, long timeoutInMillis,
                                       String cacheType) {
-        Object serialisedObj = null;
+        V serialisedObj = null;
         long nanos = System.nanoTime();
         try {
-            Object cacheVal = client.get(key,timeoutInMillis, TimeUnit.MILLISECONDS);
+            V cacheVal = client.get(key,timeoutInMillis, TimeUnit.MILLISECONDS);
             if(cacheVal==null){
                 logCacheMiss(key,cacheType);
             } else {
                 logCacheHit(key,cacheType);
                 serialisedObj = cacheVal;
             }
-        } catch(Exception e) {
-            logger.warn("Unable to contact memcached for get({}): {}", key, e.getMessage());
         } catch(Throwable e) {
             logger.warn("Exception thrown when communicating with memcached for get({}): {}", key, e.getMessage());
         } finally {
@@ -547,8 +543,7 @@ import java.util.function.Supplier;
             metricRecorder.setDuration(cacheType,System.nanoTime()-nanos);
         }
 
-
-        return (V)serialisedObj;
+        return serialisedObj;
     }
 
     /**
@@ -557,7 +552,7 @@ import java.util.function.Supplier;
      * @param key The key under which to find a cached object.
      * @return The cached object
      */
-    private V getFromDistributedCache(ReferencedClient client,String key) {
+    private V getFromDistributedCache(ReferencedClient<V> client,String key) {
         return getFromDistributedCache(client,key,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
     }
 
