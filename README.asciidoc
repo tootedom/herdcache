@@ -1089,13 +1089,21 @@ $JAVA_HOME/bin/java -jar target/performancetests-test-jar-with-dependencies.jar
 
 Example output:
 
-Benchmark                                                                        Mode  Cnt    Score   Error   Units
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest  thrpt   60   21.335 ± 1.396  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTest                 thrpt   60   21.315 ± 0.706  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTest        thrpt   60   21.194 ± 0.873  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTest             thrpt   60   20.755 ± 0.340  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                            thrpt   60   57.897 ± 1.095  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                          thrpt   60  123.656 ± 2.166  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                           thrpt   60   81.231 ± 1.841  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                         thrpt   60  136.641 ± 3.344  ops/ms
+Benchmark                                                                                  Mode  Cnt    Score    Error   Units
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest            thrpt   40   48.359 ±  5.699  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTestLargeValue  thrpt   40   47.423 ± 16.481  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTest                           thrpt   40   46.821 ±  8.525  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTestLargeValue                 thrpt   40   38.507 ± 10.402  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTest                  thrpt   40   48.549 ± 10.593  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTestLargeValue        thrpt   40   32.091 ±  8.526  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyNoKeyHashingJenkinsTest              thrpt   40   54.154 ±  9.703  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyNoKeyHashingJenkinsTestLargeValue    thrpt   40   51.703 ± 24.600  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applySHA256HashingJenkinsTest             thrpt   40   42.654 ±  1.257  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applySHA256HashingJenkinsTestLargeValue   thrpt   40   31.011 ±  6.156  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTest                       thrpt   40   47.783 ±  7.174  ops/ms
+o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTestLargeValue             thrpt   40   45.857 ± 13.562  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                                      thrpt   40   72.708 ±  2.179  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                                    thrpt   40  162.476 ±  3.815  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                                     thrpt   40  105.303 ±  2.542  ops/ms
+o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                                   thrpt   40  173.413 ±  6.217  ops/ms
 ----

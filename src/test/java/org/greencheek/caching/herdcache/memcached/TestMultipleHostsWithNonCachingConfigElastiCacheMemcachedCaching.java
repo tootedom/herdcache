@@ -36,11 +36,11 @@ import static org.junit.Assert.fail;
  */
 public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
-    private MemcachedDaemonWrapper memcached1;
-    private MemcachedDaemonWrapper memcached2;
+    MemcachedDaemonWrapper memcached1;
+    MemcachedDaemonWrapper memcached2;
 
-    private ListeningExecutorService executorService;
-    private CacheWithExpiry cache;
+    ListeningExecutorService executorService;
+    CacheWithExpiry cache;
 
     @Before
     public void setUp() {
@@ -77,7 +77,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         executorService.shutdownNow();
     }
 
-    ElastiCacheMemcachedCache<String> createCache(int configServerPort,HashAlgorithm algo,ClientClusterUpdateObserver observer) {
+    CacheWithExpiry<String> createCache(int configServerPort,HashAlgorithm algo,ClientClusterUpdateObserver observer) {
         return new ElastiCacheMemcachedCache<String>(
                 new ElastiCacheCacheConfigBuilder()
                         .setElastiCacheConfigHosts("localhost:" + configServerPort)

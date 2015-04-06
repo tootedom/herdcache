@@ -312,7 +312,7 @@ import java.util.function.Supplier;
         ReferencedClient client = clientFactory.getClient();
         if(!client.isAvailable()) {
             warnCacheDisabled();
-            return scheduleValueComputation(key,computation,executorService);
+            return scheduleValueComputation(keyString,computation,executorService);
         }
         else {
             String staleCacheKey = null;

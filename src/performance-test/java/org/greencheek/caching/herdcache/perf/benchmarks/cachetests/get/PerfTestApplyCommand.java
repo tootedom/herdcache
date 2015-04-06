@@ -1,9 +1,7 @@
 package org.greencheek.caching.herdcache.perf.benchmarks.cachetests.get;
 
-import org.greencheek.caching.herdcache.perf.benchmarks.cachetests.cacheobjects.BinaryAsciiOnlyKeysSpyMemcachedCache;
-import org.greencheek.caching.herdcache.perf.benchmarks.cachetests.cacheobjects.FolsomMemcachedCache;
-import org.greencheek.caching.herdcache.perf.benchmarks.cachetests.cacheobjects.JenkinsHashSpyMemcachedCache;
-import org.greencheek.caching.herdcache.perf.benchmarks.cachetests.cacheobjects.XXHashAlgoSpyMemcachedCache;
+import org.greencheek.caching.herdcache.memcached.util.TestCacheValues;
+import org.greencheek.caching.herdcache.perf.benchmarks.cachetests.cacheobjects.*;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -49,4 +47,73 @@ public class PerfTestApplyCommand {
                 () -> {return "value1";}
         ).get();
     }
+
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyNoKeyHashingJenkinsTest(NoKeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return "value1";}
+        ).get();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applySHA256HashingJenkinsTest(SHA256KeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return "value1";}
+        ).get();
+    }
+
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyDefaultKetamaHashAlgoTestLargeValue(BinaryAsciiOnlyKeysSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyJenkinsHashAlgoTestLargeValue(JenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyXXHashAlgoTestLargeValue(XXHashAlgoSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyFolsomTestLargeValue(FolsomMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyNoKeyHashingJenkinsTestLargeValue(NoKeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applySHA256HashingJenkinsTestLargeValue(SHA256KeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
 }

@@ -21,8 +21,8 @@ public class BenchmarkRunner {
                 .measurementIterations(20)
                 .timeUnit(TimeUnit.MILLISECONDS)
                 .jvmArgs(JvmArgs.getJvmArgs())
-                .forks(3)
-                .threads(2)
+                .forks(2)
+                .threads(4)
                 .resultFormat(ResultFormatType.TEXT)
                 .verbosity(VerboseMode.EXTRA)
                 .build();

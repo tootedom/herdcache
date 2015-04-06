@@ -16,7 +16,7 @@
     <logger name="io.netty" level="WARN"/>
     <logger name="org.greencheek.caching.herdcache.memcached.spy.extensions" level="WARN"/>
 
-    <root level="DEBUG">
+    <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
