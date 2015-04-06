@@ -153,8 +153,12 @@ import java.util.function.Supplier;
                return new NoKeyHashing();
            case NATIVE_XXHASH:
                return new FastestXXHashKeyHashing();
+           case NATIVE_XXHASH_64:
+               return new XXHashKeyHashing(true,true);
            case JAVA_XXHASH:
                return new JavaXXHashKeyHashing();
+           case JAVA_XXHASH_64:
+               return new XXHashKeyHashing(false,true);
            case MD5_UPPER:
                return new MessageDigestHashing(KeyHashing.MD5,Runtime.getRuntime().availableProcessors()*2,true);
            case SHA256_UPPER:
@@ -335,9 +339,9 @@ import java.util.function.Supplier;
                 if(cachedObject == null)
                 {
                     logger.debug("set requested for {}", keyString);
-                    cacheWriteFunction(client,computation, promise,
+                    cacheWriteFunction(client, computation, promise,
                             keyString, staleCacheKey,
-                            timeToLive,staleCacheExpiry,executorService,
+                            timeToLive, staleCacheExpiry, executorService,
                             canCacheValueEvalutor);
                 }
                 else {

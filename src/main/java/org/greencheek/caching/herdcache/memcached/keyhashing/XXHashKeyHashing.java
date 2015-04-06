@@ -10,13 +10,20 @@ import java.io.UnsupportedEncodingException;
 public class XXHashKeyHashing implements KeyHashing {
 
     private final XXHashFactory factory;
+    private final boolean use64BitHashing;
 
     public XXHashKeyHashing(boolean allowNative) {
+         this(true,false);
+    }
+
+    public XXHashKeyHashing(boolean allowNative, boolean use64BitHashing) {
         if(allowNative) {
             factory = XXHashFactory.fastestInstance();
         } else {
             factory = XXHashFactory.fastestJavaInstance();
         }
+
+        this.use64BitHashing = use64BitHashing;
     }
 
     @Override
@@ -33,6 +40,10 @@ public class XXHashKeyHashing implements KeyHashing {
 
     @Override
     public String hash(byte[] bytes, int offset, int length) {
-        return Integer.toString(factory.hash32().hash(bytes, offset, length, 0));
+        if(use64BitHashing) {
+            return Long.toString(factory.hash64().hash(bytes, offset, length, 0));
+        } else {
+            return Integer.toString(factory.hash32().hash(bytes, offset, length, 0));
+        }
     }
 }

@@ -27,7 +27,6 @@ public class XXHashAlgoSpyMemcachedCache {
                 .setMemcachedHosts("localhost:11211")
                 .setTimeToLive(Duration.ofSeconds(60))
                 .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                .setAsciiOnlyKeys(true)
                 .setHashAlgorithm(new XXHashAlogrithm())
                 .buildMemcachedConfig());
     }

@@ -63,6 +63,8 @@ public class TestSimpleGetMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        executorService.shutdownNow();
     }
 
     @Test
@@ -181,7 +183,7 @@ public class TestSimpleGetMemcachedCaching {
     @Test
     public void testGetReturnsFromDisabledMemcachedCache() {
 
-        cache = new SpyMemcachedCache<>(
+        SpyMemcachedCache cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhosty:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(2))
@@ -192,7 +194,7 @@ public class TestSimpleGetMemcachedCaching {
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -220,7 +222,7 @@ public class TestSimpleGetMemcachedCaching {
             e.printStackTrace();
         }
 
-
+        cache.shutdown();
 
     }
 

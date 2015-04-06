@@ -13,26 +13,26 @@ import java.io.IOException;
  */
 public class SnappyPerfTest {
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] xerialCompress() throws IOException {
         return org.xerial.snappy.Snappy.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] iq80Compresss() {
         return org.iq80.snappy.Snappy.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] xerialDecompress() throws IOException {
         return org.xerial.snappy.Snappy.uncompress(TestCacheValues.LARGE_COMPRESSED_BYTES);
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] iq80Decompresss() {
         return org.iq80.snappy.Snappy.uncompress(TestCacheValues.LARGE_COMPRESSED_BYTES,0,TestCacheValues.LARGE_COMPRESSED_BYTES.length);

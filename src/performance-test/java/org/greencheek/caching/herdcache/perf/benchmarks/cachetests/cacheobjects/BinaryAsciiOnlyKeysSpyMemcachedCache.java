@@ -25,7 +25,6 @@ public class BinaryAsciiOnlyKeysSpyMemcachedCache {
                 .setMemcachedHosts("localhost:11211")
                 .setTimeToLive(Duration.ofSeconds(60))
                 .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                .setAsciiOnlyKeys(true)
                 .buildMemcachedConfig());
     }
 

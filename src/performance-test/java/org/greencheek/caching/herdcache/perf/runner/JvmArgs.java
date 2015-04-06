@@ -5,7 +5,7 @@ public class JvmArgs {
     private final static String[] JVM_ARGS = new String[]{"-server"};
 
     public static String[] getJvmArgs() {
-        String profile = System.getProperty("enablejfr","true");
+        String profile = System.getProperty("enablejfr","false");
         boolean flightRecorderEnabled;
         if(profile==null || profile.trim().length()==0) {
             flightRecorderEnabled = true;

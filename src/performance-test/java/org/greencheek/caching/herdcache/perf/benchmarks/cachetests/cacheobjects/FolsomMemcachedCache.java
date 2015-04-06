@@ -5,6 +5,7 @@ import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedClientType;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
+import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -23,14 +24,14 @@ public class FolsomMemcachedCache {
 
     @Setup
     public void setUp() {
-        cache = new org.greencheek.caching.herdcache.memcached.SpyMemcachedCache<String>(new ElastiCacheCacheConfigBuilder()
+        cache = new org.greencheek.caching.herdcache.memcached.FolsomMemcachedCache<String>(new ElastiCacheCacheConfigBuilder()
                 .setMemcachedHosts("localhost:11211")
                 .setTimeToLive(Duration.ofSeconds(60))
                 .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                .setAsciiOnlyKeys(true)
-                .setHashAlgorithm(new XXHashAlogrithm())
+                .setKeyHashType(KeyHashingType.NATIVE_XXHASH_64)
                 .setMemcachedClientType(MemcachedClientType.FOLSOM)
-                .buildMemcachedConfig());
+                .setUseFolsomStringClient(false)
+                .buildElastiCacheMemcachedConfig());
     }
 
     @TearDown

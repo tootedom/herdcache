@@ -4,7 +4,9 @@ import net.spy.memcached.ConnectionFactoryBuilder;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
+import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XX64HashAlogrithm;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -17,7 +19,7 @@ import java.time.Duration;
  */
 
 @State(Scope.Benchmark)
-public class JenkinsHashSpyMemcachedCache {
+public class XXNativeHashAlgoAndKeyHashingSpyMemcachedCache {
     public CacheWithExpiry<String> cache;
 
     @Setup
@@ -26,7 +28,8 @@ public class JenkinsHashSpyMemcachedCache {
                 .setMemcachedHosts("localhost:11211")
                 .setTimeToLive(Duration.ofSeconds(60))
                 .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
-                .setHashAlgorithm(new JenkinsHash())
+                .setKeyHashType(KeyHashingType.NATIVE_XXHASH_64)
+                .setHashAlgorithm(new XX64HashAlogrithm())
                 .buildMemcachedConfig());
     }
 

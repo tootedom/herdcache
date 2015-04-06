@@ -1,17 +1,15 @@
-Benchmark                                                                                  Mode  Cnt    Score    Error   Units
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest            thrpt   40   48.359 ±  5.699  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyDefaultKetamaHashAlgoTestLargeValue  thrpt   40   47.423 ± 16.481  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTest                           thrpt   40   46.821 ±  8.525  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyFolsomTestLargeValue                 thrpt   40   38.507 ± 10.402  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTest                  thrpt   40   48.549 ± 10.593  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyJenkinsHashAlgoTestLargeValue        thrpt   40   32.091 ±  8.526  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyNoKeyHashingJenkinsTest              thrpt   40   54.154 ±  9.703  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyNoKeyHashingJenkinsTestLargeValue    thrpt   40   51.703 ± 24.600  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applySHA256HashingJenkinsTest             thrpt   40   42.654 ±  1.257  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applySHA256HashingJenkinsTestLargeValue   thrpt   40   31.011 ±  6.156  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTest                       thrpt   40   47.783 ±  7.174  ops/ms
-o.g.c.h.p.b.cachetests.get.PerfTestApplyCommand.applyXXHashAlgoTestLargeValue             thrpt   40   45.857 ± 13.562  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                                      thrpt   40   72.708 ±  2.179  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                                    thrpt   40  162.476 ±  3.815  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                                     thrpt   40  105.303 ±  2.542  ops/ms
-o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                                   thrpt   40  173.413 ±  6.217  ops/ms
+Benchmark                                                       Mode  Cnt   Score    Error   Units
+PerfTestApplyCommand.applyDefaultKetamaHashAlgoTest            thrpt   40  45.778 ±  4.248  ops/ms
+PerfTestApplyCommand.applyDefaultKetamaHashAlgoTestLargeValue  thrpt   40  38.663 ± 11.279  ops/ms
+PerfTestApplyCommand.applyFolsomTest                           thrpt   40  37.213 ±  4.314  ops/ms
+PerfTestApplyCommand.applyFolsomTestLargeValue                 thrpt   40  33.782 ±  6.222  ops/ms
+PerfTestApplyCommand.applyJenkinsHashAlgoTest                  thrpt   40  49.804 ±  8.375  ops/ms
+PerfTestApplyCommand.applyJenkinsHashAlgoTestLargeValue        thrpt   40  43.057 ± 10.184  ops/ms
+PerfTestApplyCommand.applyNative64XXHashAlgoTest               thrpt   40  47.586 ±  5.329  ops/ms
+PerfTestApplyCommand.applyNative64XXHashAlgoTestLargeValue     thrpt   40  38.698 ±  8.471  ops/ms
+PerfTestApplyCommand.applyNoKeyHashingJenkinsTest              thrpt   40  56.266 ± 12.331  ops/ms
+PerfTestApplyCommand.applyNoKeyHashingJenkinsTestLargeValue    thrpt   40  60.013 ± 22.869  ops/ms
+PerfTestApplyCommand.applySHA256HashingJenkinsTest             thrpt   40  43.280 ±  1.106  ops/ms
+PerfTestApplyCommand.applySHA256HashingJenkinsTestLargeValue   thrpt   40  31.405 ±  6.456  ops/ms
+PerfTestApplyCommand.applyXXHashAlgoTest                       thrpt   40  45.088 ±  3.099  ops/ms
+PerfTestApplyCommand.applyXXHashAlgoTestLargeValue             thrpt   40  34.139 ±  6.772  ops/ms

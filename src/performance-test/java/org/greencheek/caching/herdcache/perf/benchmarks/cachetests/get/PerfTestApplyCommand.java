@@ -42,6 +42,14 @@ public class PerfTestApplyCommand {
 
     @Benchmark
     @BenchmarkMode({Mode.Throughput})
+    public String applyNative64XXHashAlgoTest(XXNativeHashAlgoAndKeyHashingSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return "value1";}
+        ).get();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
     public String applyFolsomTest(FolsomMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
                 () -> {return "value1";}
@@ -90,6 +98,15 @@ public class PerfTestApplyCommand {
                 () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
         ).get();
     }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput})
+    public String applyNative64XXHashAlgoTestLargeValue(XXNativeHashAlgoAndKeyHashingSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
+        return cache.cache.apply("key",
+                () -> {return TestCacheValues.LARGE_CACHE_VALUE;}
+        ).get();
+    }
+
 
     @Benchmark
     @BenchmarkMode({Mode.Throughput})
