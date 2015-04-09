@@ -38,7 +38,7 @@ The below details how to use the caching implementations, the differences betwee
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.10</version>
+  <version>1.0.14</version>
 </dependency>
 ----
 
