@@ -17,6 +17,8 @@ import java.util.function.Supplier;
  */
 public interface Cache<V> extends AwaitOnFuture<V> {
     static final Predicate CAN_ALWAYS_CACHE_VALUE = (X) -> true;
+    static final Predicate CACHED_VALUE_IS_ALWAYS_VALID = (X) -> true;
+    static final Duration NO_TTL = Duration.ZERO;
 
 
     default public ListenableFuture<V> apply(String key, Supplier<V> computation) {
@@ -31,8 +33,10 @@ public interface Cache<V> extends AwaitOnFuture<V> {
         return get(key, MoreExecutors.sameThreadExecutor());
     }
 
+
     public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
                                      Predicate<V> canCacheValueEvalutor);
+
 
     public ListenableFuture<V> get(String key,ListeningExecutorService executorService);
 }

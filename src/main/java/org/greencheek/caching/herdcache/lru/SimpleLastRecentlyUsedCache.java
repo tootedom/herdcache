@@ -32,8 +32,8 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
         failureHandler = (String key, Throwable t) -> { store.remove(key); };
     }
 
-    @Override
-    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService, Predicate<V> canCacheValueEvalutor) {
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor) {
         SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {

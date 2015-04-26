@@ -5,8 +5,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.netflix.hystrix.HystrixCommand;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.HashAlgorithm;
+import org.greencheek.caching.herdcache.Cache;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
@@ -19,6 +21,9 @@ import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.Jenkins
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
+import org.greencheek.caching.herdcache.util.BackEndRequest;
+import org.greencheek.caching.herdcache.util.Content;
+import org.greencheek.caching.herdcache.util.RestClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -31,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -1239,5 +1245,195 @@ public class TestSimpleMemcachedCaching {
 
         reporter.report();
         reporter.stop();
+    }
+
+    @Test
+    public void testDoNotUseCachedValue() {
+        MetricRegistry registry = new MetricRegistry();
+
+        Predicate<String> cachedValueAllowed = (String value) -> {
+            return value.equals("cacheable");
+        };
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+                        .buildMemcachedConfig()
+        );
+
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "not_cacheable";
+        }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
+
+
+        assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val, null));
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "someothervalue";
+        }, executorService, (x) -> false, cachedValueAllowed);
+
+
+        assertEquals("Value should be key1", "someothervalue", cache.awaitForFutureOrElse(val2, null));
+
+        ListenableFuture<String> val3 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "someothervalue";
+        }, executorService, org.greencheek.caching.herdcache.Cache.CAN_ALWAYS_CACHE_VALUE);
+
+
+        assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val3, null));
+
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+        Set<String> metricNames = registry.getNames();
+        assertTrue(metricNames.size() > 0);
+
+
+        reporter.report();
+        reporter.stop();
+    }
+
+    @Test
+    public void testDoNotUseSerialisedCachedValue() {
+        MetricRegistry registry = new MetricRegistry();
+
+        Predicate<Content> cachedValueAllowed  = (Content value) ->
+             value.getCreationDateEpoch() + System.currentTimeMillis() < 500;
+
+
+
+        cache = new SpyMemcachedCache<Content>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+                        .buildMemcachedConfig()
+        );
+
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+
+        ListenableFuture<Content> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return new Content("not_cacheable");
+        }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE,cachedValueAllowed);
+
+
+        assertEquals("Value should be key1", "not_cacheable", ((Content)cache.awaitForFutureOrElse(val, null)).getContent());
+
+        ListenableFuture<Content> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return new Content("someothervalue");
+        }, executorService,(x) -> false,cachedValueAllowed);
+
+
+        assertEquals("Value should be key1", "someothervalue", ((Content)cache.awaitForFutureOrElse(val2, null)).getContent());
+
+        ListenableFuture<String> val3 = cache.get("Key1");
+        assertEquals("Value should be key1", "not_cacheable", ((Content)cache.awaitForFutureOrElse(val3, null)).getContent());
+
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+        Set<String> metricNames = registry.getNames();
+        assertTrue(metricNames.size() > 0);
+
+
+        reporter.report();
+        reporter.stop();
+    }
+
+    @Test
+    public void testSynchronous() {
+
+        cache = new SpyMemcachedCache<Content>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
+                        .buildMemcachedConfig()
+        );
+
+        RestClient timeoutClient = new RestClient() {
+            @Override
+            public Content get(String key) {
+                try {
+                    Thread.sleep(20000);
+                    return new Content("content");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException();
+                }
+            }
+
+            public String toString() {
+                return "timeoutClient";
+            }
+        };
+
+        RestClient baseClient = new RestClient() {
+            @Override
+            public Content get(String key) {
+                return new Content("content_from_client");
+            }
+
+            public String toString() {
+                return "baseClient";
+            }
+        };
+
+
+        assertEquals("content_from_client", new BackEndRequest("World",baseClient,cache).execute().getContent());
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        HystrixCommand<Content> content = new BackEndRequest("World",timeoutClient,cache);
+
+        assertEquals("content_from_client", content.execute().getContent());
+
+        assertTrue(content.isResponseFromFallback());
     }
 }

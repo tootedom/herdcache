@@ -27,7 +27,7 @@ public class FolsomMemcachedCache {
         cache = new org.greencheek.caching.herdcache.memcached.FolsomMemcachedCache<String>(new ElastiCacheCacheConfigBuilder()
                 .setMemcachedHosts("localhost:11211")
                 .setTimeToLive(Duration.ofSeconds(60))
-                .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                .setProtocol(ConnectionFactoryBuilder.Protocol.BINARY)
                 .setKeyHashType(KeyHashingType.NATIVE_XXHASH_64)
                 .setMemcachedClientType(MemcachedClientType.FOLSOM)
                 .setUseFolsomStringClient(false)

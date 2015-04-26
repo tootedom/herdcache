@@ -1,5 +1,7 @@
 package org.greencheek.caching.herdcache.memcached;
 
+//import com.github.benmanes.caffeine.cache.Caffeine;
+//import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
@@ -17,10 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -63,10 +62,10 @@ import java.util.function.Supplier;
     private final KeyHashing keyHashingFunction;
     private final String keyprefix;
     private final MemcachedClientFactory clientFactory;
-    private final ConcurrentLinkedHashMap<String,ListenableFuture<V>> store;
+    private final ConcurrentMap<String,ListenableFuture<V>> store;
     private final int staleMaxCapacityValue;
     private final Duration staleCacheAdditionalTimeToLiveValue;
-    private final ConcurrentLinkedHashMap<String,ListenableFuture<V>> staleStore;
+    private final ConcurrentMap<String,ListenableFuture<V>> staleStore;
 
     private final long memcachedGetTimeoutInMillis;
     private final long staleCacheMemachedGetTimeoutInMillis;
@@ -86,6 +85,8 @@ import java.util.function.Supplier;
         this.clientFactory = clientFactory;
 
         int maxCapacity = config.getMaxCapacity();
+
+//        this.store = (ConcurrentMap)Caffeine.newBuilder().maximumSize(maxCapacity).initialCapacity(maxCapacity).build().asMap();
 
         this.store = new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
                 .initialCapacity(maxCapacity)
@@ -295,6 +296,12 @@ import java.util.function.Supplier;
         return apply(key,computation,config.getTimeToLive(),executorService,canCacheValueEvalutor);
     }
 
+    @Override
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid) {
+        return apply(key,computation,config.getTimeToLive(),executorService,canCacheValueEvalutor,isCachedValueValid);
+    }
+
 
     @Override
     public ListenableFuture<V> apply(String key,
@@ -310,6 +317,17 @@ import java.util.function.Supplier;
                                      Duration timeToLive,
                                      ListeningExecutorService executorService,
                                      Predicate<V> canCacheValueEvalutor) {
+        return apply(key,computation,timeToLive,executorService,canCacheValueEvalutor,CACHED_VALUE_IS_ALWAYS_VALID);
+    }
+
+
+    @Override
+    public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     Duration timeToLive,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid)
+    {
 
         String keyString = getHashedKey(key);
 
@@ -335,8 +353,8 @@ import java.util.function.Supplier;
             if(existingFuture==null) {
                 logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
                 // check memcached.
-                Object cachedObject = getFromDistributedCache(client,keyString);
-                if(cachedObject == null)
+                V cachedObject = (V)getFromDistributedCache(client,keyString);
+                if(cachedObject == null || !isCachedValueValid.test(cachedObject))
                 {
                     logger.debug("set requested for {}", keyString);
                     cacheWriteFunction(client, computation, promise,
@@ -538,7 +556,7 @@ import java.util.function.Supplier;
                 logCacheMiss(key,cacheType);
             } else {
                 logCacheHit(key,cacheType);
-                serialisedObj = cacheVal;
+                serialisedObj = (V) cacheVal;
             }
         } catch(Throwable e) {
             logger.warn("Exception thrown when communicating with memcached for get({}): {}", key, e.getMessage());
@@ -557,7 +575,7 @@ import java.util.function.Supplier;
      * @return The cached object
      */
     private V getFromDistributedCache(ReferencedClient<V> client,String key) {
-        return getFromDistributedCache(client,key,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
+        return (V)getFromDistributedCache(client,key,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
     }
 
 

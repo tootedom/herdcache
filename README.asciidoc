@@ -958,6 +958,123 @@ The cache will connect to the new config cluster endpoint and obtain the cache c
 `setReconnectDelay(Duration.ofSeconds(5))` (5 seconds is the default), before attempting the connection to the new cluster
 config endpoint.  You can reduce or increase this timeout.
 
+
+'''
+
+==== ElastiCache Use Cached Value Predicate
+
+
+This feature is available in `1.0.15` and above.
+
+This feature allows you to choose whether a cache value should be used or not.  An example here would be:
+
+- You are storing a serialised object with an internal TTL.
+- You store the object in memcached (elasticache), with a 0 TTL (never expire)
+- Herd cache apply(...) method is used within a Hystrix command execution to either obtain an item from cache, or calculate from backend
+- The Cache value is only used in the Hystrix command execute if the item is Fresh enough (A Predicate<V> is provided to check the TTL)
+- The backend service is currently dead, so the Hystrix command fallback is executed
+- The hystrix command fallback returns the stale item from cache by calling herdcache get(..) method
+
+[source,java]
+----
+import java.io.Serializable;
+
+public class Content implements Serializable {
+    private static final long serialVersionUID = 1999L;
+
+
+    private final long creationDateEpoch;
+    private final String content;
+
+    public Content(String content) {
+        this.creationDateEpoch = System.currentTimeMillis();
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public long getCreationDateEpoch() {
+        return creationDateEpoch;
+    }
+}
+
+....
+....
+
+import com.netflix.hystrix.HystrixCommand;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixThreadPoolProperties;
+import org.greencheek.caching.herdcache.CacheWithExpiry;
+
+import java.util.concurrent.Future;
+import java.util.function.Predicate;
+
+public class BackEndRequest extends HystrixCommand<Content> {
+
+    Predicate<Content> cachedValueAllowed  = (Content value) -> value.getCreationDateEpoch() + System.currentTimeMillis() < 500;
+
+    private final String key;
+    private final RestClient client;
+    private final CacheWithExpiry<Content> cache;
+    private final Content FALLBACK = new Content("{}");
+
+    public BackEndRequest(String key, RestClient client, CacheWithExpiry<Content> cache) {
+        super(HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("BackEnd"))
+                .andThreadPoolPropertiesDefaults(HystrixThreadPoolProperties.Setter().withCoreSize(10)
+                        .withMaxQueueSize(1000))
+
+                .andCommandPropertiesDefaults(HystrixCommandProperties.Setter().withExecutionTimeoutInMilliseconds(1000)
+                        .withExecutionIsolationStrategy(HystrixCommandProperties.ExecutionIsolationStrategy.THREAD)
+                        .withExecutionIsolationThreadInterruptOnTimeout(true)));
+
+
+        this.key = key;
+        this.client = client;
+        this.cache = cache;
+    }
+
+    @Override
+    protected Content run() throws Exception {
+        Future<Content> content = cache.apply(key,
+                () -> client.get(key),
+                com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService(),
+                org.greencheek.caching.herdcache.Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
+
+        if(content == null) {
+            throw new RuntimeException("failed to obtain key: " + key);
+        } else {
+            return content.get();
+        }
+    }
+
+    @Override
+    protected Content getFallback() {
+
+        Content content = null;
+        try {
+            content = cache.get(key).get();
+            if(content == null) {
+                return FALLBACK;
+            } else {
+                return content;
+            }
+        } catch (Exception e) {
+            return FALLBACK;
+        }
+
+    }
+}
+
+
+----
+
+
+
+
+
 '''
 
 ==== Example Simple ElastiCache Test Class

@@ -15,7 +15,7 @@ import java.util.concurrent.ExecutionException;
  */
 public class PerfTestApplyCommand {
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyDefaultKetamaHashAlgoTest(BinaryAsciiOnlyKeysSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -24,7 +24,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyJenkinsHashAlgoTest(JenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -32,7 +32,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyXXHashAlgoTest(XXHashAlgoSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -40,7 +40,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyNative64XXHashAlgoTest(XXNativeHashAlgoAndKeyHashingSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -57,7 +57,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyNoKeyHashingJenkinsTest(NoKeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -65,7 +65,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applySHA256HashingJenkinsTest(SHA256KeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -74,7 +74,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyDefaultKetamaHashAlgoTestLargeValue(BinaryAsciiOnlyKeysSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -83,7 +83,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyJenkinsHashAlgoTestLargeValue(JenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -91,7 +91,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyXXHashAlgoTestLargeValue(XXHashAlgoSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -99,7 +99,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyNative64XXHashAlgoTestLargeValue(XXNativeHashAlgoAndKeyHashingSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -108,7 +108,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyFolsomTestLargeValue(FolsomMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -117,7 +117,7 @@ public class PerfTestApplyCommand {
     }
 
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applyNoKeyHashingJenkinsTestLargeValue(NoKeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
@@ -125,7 +125,7 @@ public class PerfTestApplyCommand {
         ).get();
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public String applySHA256HashingJenkinsTestLargeValue(SHA256KeyHashingJenkinsHashSpyMemcachedCache cache) throws IOException, ExecutionException, InterruptedException {
         return cache.cache.apply("key",
