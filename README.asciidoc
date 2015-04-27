@@ -1043,11 +1043,14 @@ public class BackEndRequest extends HystrixCommand<Content> {
                 com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService(),
                 org.greencheek.caching.herdcache.Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
 
-        if(content == null) {
+
+        Content c = content.get();
+        if(c==null) {
             throw new RuntimeException("failed to obtain key: " + key);
         } else {
-            return content.get();
+            return c;
         }
+
     }
 
     @Override

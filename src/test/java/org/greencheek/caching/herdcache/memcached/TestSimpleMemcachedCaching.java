@@ -1382,7 +1382,7 @@ public class TestSimpleMemcachedCaching {
     }
 
     @Test
-    public void testSynchronous() {
+    public void testDoNotUseSerialisedCachedValueAndHystrix() {
 
         cache = new SpyMemcachedCache<Content>(
                 new ElastiCacheCacheConfigBuilder()
