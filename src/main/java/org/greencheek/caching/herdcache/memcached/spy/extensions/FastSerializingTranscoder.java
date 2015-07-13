@@ -66,6 +66,7 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
             logger.warn("Caught CNFE decoding {} bytes of data",
                     in == null ? 0 : in.length, e);
         }
+
         return rv;
     }
 
@@ -77,13 +78,18 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
             throw new NullPointerException("Can't serialize null");
         }
         byte[] rv = null;
+        FSTObjectOutput os=null;
         try {
-            FSTObjectOutput os = conf.getObjectOutput();
+            os = conf.getObjectOutput();
             os.writeObject(o);
             os.flush();
             rv = os.getCopyOfWrittenBuffer();
         } catch (IOException e) {
             throw new IllegalArgumentException("Non-serializable object", e);
+        } finally {
+            if(os!=null) {
+                os.resetForReUse();
+            }
         }
         return rv;
     }

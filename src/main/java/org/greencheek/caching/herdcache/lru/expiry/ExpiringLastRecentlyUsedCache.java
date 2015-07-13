@@ -55,9 +55,8 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
         return store.size();
     }
 
-
-    @Override
-    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService, Predicate<V> canCacheValueEvalutor) {
+    public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueUsable) {
         TimedEntry<V> value = store.get(key);
         if(value==null) {
             return insertTimedEntry(key,computation,executorService,canCacheValueEvalutor);

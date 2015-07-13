@@ -56,21 +56,39 @@
         <concurrentlinkedhashmap.version>1.4.2</concurrentlinkedhashmap.version>
 
         <hystrix.version>1.4.5</hystrix.version>
-        <spy.version>2.11.6</spy.version>
+        <spy.version>2.12.0</spy.version>
         <jsr666e.version>1.1.0</jsr666e.version>
         <slf4j.version>1.7.10</slf4j.version>
         <memcachedtest.version>1.0.0</memcachedtest.version>
         <xxhashing.version>1.3.0</xxhashing.version>
-        <jsnappy.version>1.1.1.6</jsnappy.version>
-        <snappy11.version>1.1.1.6</snappy11.version>
+        <jsnappy.version>1.1.1.7</jsnappy.version>
         <logback.version>1.1.1</logback.version>
         <junit.version>4.11</junit.version>
-        <netty.version>4.0.26.Final</netty.version>
+        <netty.version>4.0.29.Final</netty.version>
         <fst.version>1.63</fst.version>
         <jmh.version>1.7.1</jmh.version>
         <metrics.version>3.1.0</metrics.version>
     </properties>
     <dependencies>
+        <!--<dependency>-->
+            <!--<groupId>redis.clients</groupId>-->
+            <!--<artifactId>jedis</artifactId>-->
+            <!--<version>2.6.2</version>-->
+            <!--<type>jar</type>-->
+            <!--<scope>compile</scope>-->
+        <!--</dependency>-->
+        <!--<dependency>-->
+            <!--<groupId>org.rarefiedredis.redis</groupId>-->
+            <!--<artifactId>redis-java</artifactId>-->
+            <!--<version>0.0.14</version>-->
+            <!--<scope>test</scope>-->
+        <!--</dependency>-->
+        <!--<dependency>-->
+            <!--<groupId>com.github.kstyrc</groupId>-->
+            <!--<artifactId>embedded-redis</artifactId>-->
+            <!--<version>0.6</version>-->
+            <!--<scope>test</scope>-->
+        <!--</dependency>-->
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
@@ -141,7 +159,7 @@
         <dependency>
             <groupId>com.spotify</groupId>
             <artifactId>folsom</artifactId>
-            <version>0.6.1</version>
+            <version>0.7.1</version>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>

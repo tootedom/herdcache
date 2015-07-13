@@ -7,5 +7,5 @@ import java.util.List;
  * creates a ReferencedClient object
  */
 public interface ReferencedClientFactory<V> {
-    ReferencedClient<V> createClient(List<InetSocketAddress> resolvedHosts);
+    ReferencedClient createClient(List<InetSocketAddress> resolvedHosts);
 }

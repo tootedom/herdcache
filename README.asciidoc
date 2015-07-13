@@ -621,7 +621,7 @@ has the potential to break the TEXT protocol key requirements (Hashing the key m
 ====  Chosing Not To Cache
 
 
-Since 1.0.6 the client has the following method:
+Since 1.0.6 the client (`Cache<V>`) has the following method:
 
 [source,java]
 ----
@@ -961,7 +961,7 @@ config endpoint.  You can reduce or increase this timeout.
 
 '''
 
-==== ElastiCache Use Cached Value Predicate
+==== ElastiCache Chosing Not to use a Cached Value Predicate
 
 
 This feature is available in `1.0.15` and above.
@@ -1014,12 +1014,21 @@ import java.util.function.Predicate;
 
 public class BackEndRequest extends HystrixCommand<Content> {
 
+    // Static fallback
+    private static final Content FALLBACK = new Content("{}");
+
+    // If the value returned by the computation is the FALLBACK, do not cache
+    Predicate<Content> backendComputationValueCachable  = (Content value) -> value != FALLBACK;
+
+
+    // If returned cached value is older than 500ms, do not use the value.  Instead re-calculate it, by calling
+    // the backend command
     Predicate<Content> cachedValueAllowed  = (Content value) -> value.getCreationDateEpoch() + System.currentTimeMillis() < 500;
 
     private final String key;
-    private final RestClient client;
+    private final HttpRestClient client;
     private final CacheWithExpiry<Content> cache;
-    private final Content FALLBACK = new Content("{}");
+
 
     public BackEndRequest(String key, RestClient client, CacheWithExpiry<Content> cache) {
         super(HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("BackEnd"))
@@ -1075,6 +1084,25 @@ public class BackEndRequest extends HystrixCommand<Content> {
 ----
 
 
+'''
+
+==== User Supplied Expiry
+
+
+===== Do Not Cross The Streams
+
+[quote, Egon Spengler, Ghostbusters]
+----
+Egon Spengler: There's something very important I forgot to tell you.
+Peter Venkman: What?
+Spengler: Don't cross the streams.
+Venkman: Why?
+Spengler: It would be bad.
+Venkman: I'm fuzzy on the whole good/bad thing. What do you mean, "bad"?
+Spengler: Try to imagine all life as you know it stopping instantaneously and every molecule in your body exploding at the speed of light.
+Ray Stantz: Total protonic reversal!
+Venkman: Right. That's bad. Okay. All right. Important safety tip. Thanks, Egon.
+----
 
 
 

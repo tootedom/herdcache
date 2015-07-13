@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException;
 /**
  *
  */
-public class SpyReferencedClient<V> implements ReferencedClient<V> {
+public class SpyReferencedClient<V> implements ReferencedClient {
 
     private static final Logger logger = LoggerFactory.getLogger(SpyReferencedClient.class);
     public static final ReferencedClient UNAVAILABLE_REFERENCE_CLIENT = new SpyReferencedClient(false, Collections.<InetSocketAddress>emptyList(),null);
@@ -45,11 +45,11 @@ public class SpyReferencedClient<V> implements ReferencedClient<V> {
     }
 
     @Override
-    public V get(String key, long timeout, TimeUnit unit) {
-        V value = null;
+    public Object get(String key, long timeout, TimeUnit unit) {
+        Object value = null;
         try {
             Future<Object> future =  client.asyncGet(key);
-            value = (V)future.get(timeout,unit);
+            value = future.get(timeout,unit);
         } catch ( OperationTimeoutException | CheckedOperationTimeoutException e) {
             logger.warn("timeout when retrieving key {} from memcached",key);
         } catch (TimeoutException e) {
@@ -63,7 +63,7 @@ public class SpyReferencedClient<V> implements ReferencedClient<V> {
     }
 
     @Override
-    public Future set(String key, int entryTTLInSeconds, V value) {
+    public Future set(String key, int entryTTLInSeconds, Object value) {
         return client.set(key, entryTTLInSeconds, value);
     }
 

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException;
 /**
  *
  */
-public class FolsomReferencedClient<V> implements ReferencedClient<V> {
+public class FolsomReferencedClient implements ReferencedClient {
 
     private static final Logger logger = LoggerFactory.getLogger(FolsomReferencedClient.class);
     private final boolean isAvailable;
@@ -43,11 +43,11 @@ public class FolsomReferencedClient<V> implements ReferencedClient<V> {
     }
 
     @Override
-    public V get(String key, long timeout, TimeUnit unit) {
-        V value = null;
+    public Object get(String key, long timeout, TimeUnit unit) {
+        Object value = null;
         try {
             Future<Object> future =  client.get(key);
-            value = (V)future.get(timeout,unit);
+            value = future.get(timeout,unit);
         } catch ( OperationTimeoutException | CheckedOperationTimeoutException e) {
             logger.warn("timeout when retrieving key {} from memcached",key);
         } catch (TimeoutException e) {
@@ -61,7 +61,7 @@ public class FolsomReferencedClient<V> implements ReferencedClient<V> {
     }
 
     @Override
-    public Future set(String key, int ttlInSeconds, V value) {
+    public Future set(String key, int ttlInSeconds, Object value) {
 
         return client.set(key, value, ttlInSeconds);
     }

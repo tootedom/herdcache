@@ -8,13 +8,13 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by dominictootell on 05/04/2015.
  */
-public interface ReferencedClient<V> {
+public interface ReferencedClient {
 
     boolean isAvailable();
     List<InetSocketAddress> getResolvedHosts();
 
-    V get(String key, long time,TimeUnit unit);
-    Future set(String key, int ttlInSeconds, V value);
+    Object get(String key, long time,TimeUnit unit);
+    Future set(String key, int ttlInSeconds, Object value);
     Future delete(String key);
     Future flush();
 

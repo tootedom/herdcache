@@ -33,7 +33,7 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
     }
 
     public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,
-                                     Predicate<V> canCacheValueEvalutor) {
+                                     Predicate<V> canCacheValueEvalutor, Predicate<V> cachedValueIsAlwaysValid) {
         SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {

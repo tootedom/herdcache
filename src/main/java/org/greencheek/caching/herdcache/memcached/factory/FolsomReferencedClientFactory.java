@@ -26,13 +26,12 @@ public class FolsomReferencedClientFactory<V> implements ReferencedClientFactory
 
 
     @Override
-    public ReferencedClient<V> createClient(List<InetSocketAddress> resolvedHosts) {
+    public ReferencedClient createClient(List<InetSocketAddress> resolvedHosts) {
 
         List<HostAndPort> hosts = resolvedHosts.stream().map(x ->
                         HostAndPort.fromParts(x.getHostName(), x.getPort())
         ).collect(Collectors.toList());
 
-        System.out.println(hosts);
         MemcacheClientBuilder builder = null;
         if(config.useFolsomStringClient()) {
             builder = new MemcacheClientBuilder<>(new StringTranscoder(config.getFolsomStringClientCharset()));
@@ -53,6 +52,6 @@ public class FolsomReferencedClientFactory<V> implements ReferencedClientFactory
         }
 
 
-        return new FolsomReferencedClient<>(true,resolvedHosts,client);
+        return new FolsomReferencedClient(true,resolvedHosts,client);
     }
 }

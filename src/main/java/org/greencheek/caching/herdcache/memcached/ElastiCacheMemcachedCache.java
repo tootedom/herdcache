@@ -11,12 +11,13 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.Local
 import org.greencheek.caching.herdcache.memcached.factory.ElastiCacheClientFactory;
 import org.greencheek.caching.herdcache.memcached.factory.ReferencedClientFactory;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
  *
  */
-public class ElastiCacheMemcachedCache<V> extends BaseMemcachedCache<V> {
+public class ElastiCacheMemcachedCache<V extends Serializable> extends BaseMemcachedCache<V> {
 
 
     public ElastiCacheMemcachedCache(ElastiCacheCacheConfig config) {

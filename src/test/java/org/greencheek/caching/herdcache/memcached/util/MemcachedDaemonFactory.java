@@ -17,11 +17,11 @@ public class MemcachedDaemonFactory {
 
     public static MemcachedDaemonWrapper createMemcachedDaemon(boolean binary) {
         ServerSocket portServerSocket = PortUtil.findFreePort();
-        int memcachedDport = PortUtil.getPort(portServerSocket);
-        return startMemcachedDaemon(memcachedDport, binary);
+        return startMemcachedDaemon(binary,portServerSocket);
     }
 
-    private static MemcachedDaemonWrapper startMemcachedDaemon(int port, boolean binary) {
+    private static MemcachedDaemonWrapper startMemcachedDaemon(boolean binary,ServerSocket portServerSocket) {
+        int port = -1;
         try {
             MemCacheDaemon<LocalCacheElement> daemon = new MemCacheDaemon<LocalCacheElement>();
 
@@ -29,12 +29,13 @@ public class MemcachedDaemonFactory {
             CacheStorage<Key, LocalCacheElement> cacheStorage = ConcurrentLinkedHashMap.create(ConcurrentLinkedHashMap.EvictionPolicy.LRU, 1000, 512000);
             Cache<LocalCacheElement> cacheImpl = new CacheImpl(cacheStorage);
             daemon.setCache(cacheImpl);
-            daemon.setAddr(new InetSocketAddress("localhost", port));
+            daemon.setAddr(new InetSocketAddress("localhost", portServerSocket.getLocalPort()));
             daemon.setIdleTime(100000);
             daemon.setBinary(binary);
             daemon.setVerbose(true);
             daemon.start();
             Thread.sleep(500);
+            port =  PortUtil.getPort(portServerSocket);
             return new MemcachedDaemonWrapper(daemon, port);
         } catch (Exception e) {
             logger.error("Error starting memcached", e);
