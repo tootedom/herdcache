@@ -33,9 +33,9 @@ public class MemcachedDaemonFactory {
             daemon.setIdleTime(100000);
             daemon.setBinary(binary);
             daemon.setVerbose(true);
+            port =  PortUtil.getPort(portServerSocket);
             daemon.start();
             Thread.sleep(500);
-            port =  PortUtil.getPort(portServerSocket);
             return new MemcachedDaemonWrapper(daemon, port);
         } catch (Exception e) {
             logger.error("Error starting memcached", e);
