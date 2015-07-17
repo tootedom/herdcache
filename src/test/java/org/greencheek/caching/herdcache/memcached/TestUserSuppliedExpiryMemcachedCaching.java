@@ -14,6 +14,7 @@ import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.Jenkins
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
+import org.greencheek.caching.herdcache.memcached.util.TestCacheValues;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -438,6 +439,25 @@ public class TestUserSuppliedExpiryMemcachedCaching {
         assertEquals("bob2", cache.getOrSet("item", backendCall).get());
 
         assertEquals("bob2", cache.getOrSet("item", backendCall, (CachedItem<String> v) -> !v.hasExpired(1000),executorService).get());
+
+    }
+
+    @Test
+    public void testNoExpiryIsSetOnCachedItemLargeValue() throws Exception {
+
+        AtomicInteger timesBackendCalled = new AtomicInteger(0);
+
+
+        Supplier<String> backendCall = () -> {
+            int val = timesBackendCalled.incrementAndGet();
+            return TestCacheValues.LARGE_CACHE_VALUE;
+        };
+
+        assertEquals(TestCacheValues.LARGE_CACHE_VALUE,cache.getOrSet("item",backendCall).get());
+
+        assertEquals(TestCacheValues.LARGE_CACHE_VALUE,cache.getOrSet("item2",backendCall,executorService).get());
+
+
 
     }
 

@@ -88,7 +88,7 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
             throw new IllegalArgumentException("Non-serializable object", e);
         } finally {
             if(os!=null) {
-                os.resetForReUse();
+                os.resetForReUse(new byte[0]);
             }
         }
         return rv;
