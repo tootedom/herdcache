@@ -6,12 +6,12 @@ import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
-import org.greencheek.caching.herdcache.domain.CachedItem;
-import org.greencheek.caching.herdcache.domain.CachedItemPredicate;
 import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationCompleteNotifier;
 import org.greencheek.caching.herdcache.lru.CacheValueComputationFailureHandler;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
+import org.greencheek.caching.herdcache.memcached.domain.CachedObjectWithValidationResult;
+import org.greencheek.caching.herdcache.memcached.predicates.CachedItemPredicate;
 import org.greencheek.caching.herdcache.memcached.factory.*;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
@@ -207,25 +207,25 @@ import java.util.function.Supplier;
         metricRecorder.incrementCounter("distributed_cache_writes");
         int entryTTLInSeconds;
         Object valueToCache = value;
-        if(isUsingCachedItemWrapper) {
+        if (isUsingCachedItemWrapper) {
             valueToCache = new CachedItem<>(value);
             entryTTLInSeconds = 0;
         } else {
-            entryTTLInSeconds = (int)getDuration(timeToLive);
+            entryTTLInSeconds = (int) getDuration(timeToLive);
         }
 
-        if( waitForMemcachedSet ) {
+        if (waitForMemcachedSet) {
             Future<Boolean> futureSet = client.set(key, entryTTLInSeconds, valueToCache);
             try {
                 futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
-                logger.warn("Exception waiting for memcached set to occur",e);
+                logger.warn("Exception waiting for memcached set to occur", e);
             }
         } else {
             try {
                 client.set(key, entryTTLInSeconds, valueToCache);
             } catch (Exception e) {
-                logger.warn("Exception waiting for memcached set to occur",e);
+                logger.warn("Exception waiting for memcached set to occur", e);
             }
         }
     }
@@ -402,13 +402,6 @@ import java.util.function.Supplier;
             return scheduleValueComputation(keyString,computation,executorService);
         }
         else {
-            String staleCacheKey = null;
-            Duration staleCacheExpiry = null;
-            if(config.isUseStaleCache()) {
-                staleCacheKey = createStaleCacheKey(keyString);
-                staleCacheExpiry = timeToLive.plus(staleCacheAdditionalTimeToLiveValue);
-            }
-
             SettableFuture<V> promise = SettableFuture.create();
             // create and store a new future for the to be generated value
             // first checking against local a cache to see if the computation is already
@@ -418,48 +411,90 @@ import java.util.function.Supplier;
             if(existingFuture==null) {
                 logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
                 // check memcached.
-                Object cachedObject = getFromDistributedCache(client,keyString);
 
-                boolean invalidCachedObject;
-                if(cachedObject instanceof CachedItem) {
-                    CachedItem<V> item = (CachedItem)cachedObject;
-                    invalidCachedObject = (item == null || !evaluateIfCachedValueIsValid(item,timeToLive,isCachedValueValid));
-                    if(invalidCachedObject == false) {
-                        cachedObject = item.getCachedItem();
-                    }
-                }
-                else {
-                     invalidCachedObject = cachedObject == null || !isCachedValueValid.test((V)cachedObject);
-                }
+                CachedObjectWithValidationResult<V> validatedCachedObject = validateCachedObject(getFromDistributedCache(client,keyString),
+                        timeToLive,isCachedValueValid);
 
-                if(invalidCachedObject)
+                if(!validatedCachedObject.isCachedObjectValid)
                 {
                     logger.debug("set requested for {}", keyString);
                     cacheWriteFunction(isUsingCachedItemWrapper,client, computation, promise,
-                            keyString, staleCacheKey,
-                            timeToLive, staleCacheExpiry, executorService,
+                            keyString,
+                            timeToLive, executorService,
                             canCacheValueEvalutor);
                 }
                 else {
-                    if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                        store.remove(keyString);
-                        promise.set((V)cachedObject);
-                    } else {
-                        promise.set((V)cachedObject);
-                        store.remove(keyString);
-                    }
+                    removeFutureFromInternalCache(promise,keyString,validatedCachedObject.cachedObject,store);
                 }
                 return promise;
             } else {
-                logCacheHit(keyString, CACHE_TYPE_VALUE_CALCULATION);
-                if(config.isUseStaleCache()) {
-                    return getFutueForStaleDistributedCacheLookup(client,staleCacheKey,existingFuture,executorService);
-                } else {
-                    return existingFuture;
-                }
+                return returnStaleOrCachedItem(client,keyString,existingFuture,executorService);
             }
         }
+    }
 
+
+    private void removeFutureFromInternalCache(SettableFuture<V> promise,String keyString, V cachedObject,
+                                               ConcurrentMap<String,ListenableFuture<V>> internalCache) {
+        if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
+            internalCache.remove(keyString);
+            promise.set(cachedObject);
+        } else {
+            promise.set(cachedObject);
+            internalCache.remove(keyString);
+        }
+    }
+
+    private void removeFutureFromInternalCacheWithException(SettableFuture<V> promise,String keyString, Throwable exception,
+                                               ConcurrentMap<String,ListenableFuture<V>> internalCache) {
+        if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
+            internalCache.remove(keyString);
+            promise.setException(exception);
+        } else {
+            promise.setException(exception);
+            internalCache.remove(keyString);
+        }
+    }
+
+
+    private CachedObjectWithValidationResult<V> validateCachedObject(Object cachedObject, Duration timeToLive,
+                                                                     Predicate<V> isCachedValueValid) {
+
+        boolean validCachedObject;
+        if(cachedObject instanceof CachedItem) {
+            CachedItem<V> item = (CachedItem)cachedObject;
+            validCachedObject = (item != null && evaluateIfCachedValueIsValid(item,timeToLive,isCachedValueValid));
+            if(validCachedObject == true) {
+                cachedObject = item.getCachedItem();
+            }
+        }
+        else {
+            validCachedObject = (cachedObject != null && isCachedValueValid.test((V)cachedObject));
+        }
+
+        return new CachedObjectWithValidationResult<>((V)cachedObject,validCachedObject);
+    }
+
+    /**
+     * Checks if we should: return the future that has been found in the herd cache map, which is a another call that is
+     * either obtaining the item from the cache or calculating the value by calling the {@link java.util.function.Supplier}
+     * or if we should perform a lookup for a stale cached value.
+     *
+     * @param client The client (spy)
+     * @param keyRequested The key that has been request
+     * @param cachedFuture the existing apply(..) lookup
+     * @param executor The executor service to run any futures on.
+     * @return
+     */
+    private  ListenableFuture<V> returnStaleOrCachedItem(ReferencedClient client, String keyRequested,ListenableFuture<V> cachedFuture,
+                                                         ListeningExecutorService executor) {
+        logCacheHit(keyRequested, CACHE_TYPE_VALUE_CALCULATION);
+        if(config.isUseStaleCache()) {
+            String staleCacheKey = createStaleCacheKey(keyRequested);
+            return getFutueForStaleDistributedCacheLookup(client,staleCacheKey,cachedFuture,executor);
+        } else {
+            return cachedFuture;
+        }
     }
 
     /**
@@ -500,10 +535,10 @@ import java.util.function.Supplier;
      * @param promise the promise on which requests are waiting.
      * @param backendFuture the future that is running the long returning calculation that creates a fresh entry.
      */
-    private void getFromStaleDistributedCache(ReferencedClient client,
+    private void getFromStaleDistributedCache(final ReferencedClient client,
                                               final String key,
                                               final SettableFuture<V> promise,
-                                              ListenableFuture<V> backendFuture) {
+                                              final ListenableFuture<V> backendFuture) {
 
         Object item = getFromDistributedCache(client,key,this.staleCacheMemachedGetTimeoutInMillis, CACHE_TYPE_STALE_CACHE);
 
@@ -511,25 +546,12 @@ import java.util.function.Supplier;
             Futures.addCallback(backendFuture, new FutureCallback<V>() {
                         @Override
                         public void onSuccess(V result) {
-                            if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                staleStore.remove(key);
-                                promise.set(result);
-                            } else {
-                                promise.set(result);
-                                staleStore.remove(key);
-                            }
-
+                            removeFutureFromInternalCache(promise,key,result,staleStore);
                         }
 
                         @Override
                         public void onFailure(Throwable t) {
-                            if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                staleStore.remove(key);
-                                promise.setException(t);
-                            } else {
-                                promise.setException(t);
-                                staleStore.remove(key);
-                            }
+                            removeFutureFromInternalCacheWithException(promise, key, t, staleStore);
                         }
                     });
 
@@ -537,14 +559,8 @@ import java.util.function.Supplier;
             if(item instanceof CachedItem) {
                 item = ((CachedItem)item).getCachedItem();
             }
+            removeFutureFromInternalCache(promise,key,(V)item,staleStore);
 
-            if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                staleStore.remove(key);
-                promise.set((V)item);
-            } else {
-                promise.set((V)item);
-                staleStore.remove(key);
-            }
         }
 
     }
@@ -560,14 +576,13 @@ import java.util.function.Supplier;
      * @param itemExpiry the expiry for the item
      * @return
      */
-    private void cacheWriteFunction(boolean isUsingCachedItemWrapper,ReferencedClient client,
-                                                   Supplier<V> computation,
+    private void cacheWriteFunction(final boolean isUsingCachedItemWrapper,final ReferencedClient client,
+                                                   final Supplier<V> computation,
                                                    final SettableFuture<V> promise,
-                                                   final String key, String staleCacheKey,
-                                                   Duration itemExpiry,
-                                                   Duration staleItemExpiry,
-                                                   ListeningExecutorService executorService,
-                                                   Predicate<V> canCacheValue) {
+                                                   final String key,
+                                                   final Duration itemExpiry,
+                                                   final ListeningExecutorService executorService,
+                                                   final Predicate<V> canCacheValue) {
         final long startNanos = System.nanoTime();
         ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
         Futures.addCallback(computationFuture,
@@ -579,8 +594,10 @@ import java.util.function.Supplier;
                             if(result!=null) {
                                 if(canCacheValue.test(result)) {
                                     if (config.isUseStaleCache()) {
+                                        String staleCacheKey =  createStaleCacheKey(key);;
+                                        Duration staleCacheExpiry = itemExpiry.plus(staleCacheAdditionalTimeToLiveValue);;
                                         // overwrite the stale cache entry
-                                        writeToDistributedCache(isUsingCachedItemWrapper, client, staleCacheKey, result, staleItemExpiry, false);
+                                        writeToDistributedCache(isUsingCachedItemWrapper, client, staleCacheKey, result, staleCacheExpiry, false);
                                     }
                                     // write the cache entry
                                     writeToDistributedCache(isUsingCachedItemWrapper, client, key, result, itemExpiry, config.isWaitForMemcachedSet());
@@ -595,13 +612,7 @@ import java.util.function.Supplier;
                             logger.error("problem setting key {} in memcached", key,e);
                         } finally {
                             metricRecorder.incrementCounter("value_calculation_success");
-                            if (config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                                store.remove(key);
-                                promise.set(result);
-                            } else {
-                                promise.set(result);
-                                store.remove(key);
-                            }
+                            removeFutureFromInternalCache(promise,key,result,store);
                         }
                     }
 
@@ -609,13 +620,7 @@ import java.util.function.Supplier;
                     public void onFailure(Throwable t) {
                         metricRecorder.incrementCounter("value_calculation_failure");
                         metricRecorder.setDuration("value_calculation",System.nanoTime()-startNanos);
-                        if (config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-                            store.remove(key);
-                            promise.setException(t);
-                        } else {
-                            promise.setException(t);
-                            store.remove(key);
-                        }
+                        removeFutureFromInternalCacheWithException(promise, key, t, store);
                     }
                 });
     }

@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.domain;
+package org.greencheek.caching.herdcache.memcached;
 
 import java.io.Serializable;
 import java.time.Clock;
@@ -23,7 +23,7 @@ public class CachedItem<V extends Serializable> implements Serializable {
     private final V cachedItem;
     private final Instant creationDate;
 
-    public CachedItem(V item) {
+    protected CachedItem(V item) {
         this.cachedItem = item;
         creationDate = Instant.now(UTC);
     }

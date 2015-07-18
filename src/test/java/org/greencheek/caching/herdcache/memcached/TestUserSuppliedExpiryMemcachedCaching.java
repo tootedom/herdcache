@@ -6,7 +6,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.*;
-import org.greencheek.caching.herdcache.domain.CachedItem;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
