@@ -27,4 +27,8 @@ public class StatefulPredicate<V extends Serializable> implements Predicate<V>, 
         return wrappedPredicate.test(itemToTest);
     }
 
+    public V getTestedObject() {
+        return testedObject;
+    }
+
 }
