@@ -190,7 +190,7 @@ import java.util.function.Supplier;
     }
 
     private long getDuration(Duration timeToLive){
-        if(timeToLive==null) {
+        if(timeToLive==null || timeToLive == Duration.ZERO) {
             return 0;
         }
         else {
@@ -199,6 +199,25 @@ import java.util.function.Supplier;
         }
 
 
+    }
+
+    private void writeToDistributedCache(ReferencedClient client,
+                                         String key, Object valueToCache,
+                                         int entryTTLInSeconds, boolean waitForMemcachedSet) {
+        if (waitForMemcachedSet) {
+            Future futureSet = client.set(key, entryTTLInSeconds, valueToCache);
+            try {
+                futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                logger.warn("Exception waiting for memcached set to occur", e);
+            }
+        } else {
+            try {
+                client.set(key, entryTTLInSeconds, valueToCache);
+            } catch (Exception e) {
+                logger.warn("Exception waiting for memcached set to occur", e);
+            }
+        }
     }
 
     private void writeToDistributedCache(boolean isUsingCachedItemWrapper,ReferencedClient client,
@@ -213,21 +232,8 @@ import java.util.function.Supplier;
         } else {
             entryTTLInSeconds = (int) getDuration(timeToLive);
         }
+        writeToDistributedCache(client,key,valueToCache,entryTTLInSeconds,waitForMemcachedSet);
 
-        if (waitForMemcachedSet) {
-            Future<Boolean> futureSet = client.set(key, entryTTLInSeconds, valueToCache);
-            try {
-                futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
-            } catch (Exception e) {
-                logger.warn("Exception waiting for memcached set to occur", e);
-            }
-        } else {
-            try {
-                client.set(key, entryTTLInSeconds, valueToCache);
-            } catch (Exception e) {
-                logger.warn("Exception waiting for memcached set to occur", e);
-            }
-        }
     }
 
     private ListenableFuture<V> scheduleValueComputation(String key,Supplier<V> computation, ListeningExecutorService executorService) {
@@ -407,7 +413,7 @@ import java.util.function.Supplier;
             // first checking against local a cache to see if the computation is already
             // occurring
             ListenableFuture<V> existingFuture  = store.putIfAbsent(keyString, promise);
-            //      val existingFuture : Future[Serializable] = store.get(keyString)
+
             if(existingFuture==null) {
                 logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
                 // check memcached.
@@ -593,12 +599,7 @@ import java.util.function.Supplier;
                             metricRecorder.setDuration("value_calculation_time",System.nanoTime()-startNanos);
                             if(result!=null) {
                                 if(canCacheValue.test(result)) {
-                                    if (config.isUseStaleCache()) {
-                                        String staleCacheKey =  createStaleCacheKey(key);;
-                                        Duration staleCacheExpiry = itemExpiry.plus(staleCacheAdditionalTimeToLiveValue);;
-                                        // overwrite the stale cache entry
-                                        writeToDistributedCache(isUsingCachedItemWrapper, client, staleCacheKey, result, staleCacheExpiry, false);
-                                    }
+                                    writeToDistributedStaleCache(isUsingCachedItemWrapper, client, key, itemExpiry, result);
                                     // write the cache entry
                                     writeToDistributedCache(isUsingCachedItemWrapper, client, key, result, itemExpiry, config.isWaitForMemcachedSet());
                                 } else {
@@ -625,6 +626,15 @@ import java.util.function.Supplier;
                 });
     }
 
+    private void writeToDistributedStaleCache(boolean isUsingCachedItemWrapper, ReferencedClient client,String key,Duration ttl,
+                                   V valueToWriteToCache) {
+        if (config.isUseStaleCache()) {
+            String staleCacheKey =  createStaleCacheKey(key);;
+            Duration staleCacheExpiry = ttl.plus(staleCacheAdditionalTimeToLiveValue);
+            // overwrite the stale cache entry
+            writeToDistributedCache(isUsingCachedItemWrapper, client, staleCacheKey, valueToWriteToCache, staleCacheExpiry, false);
+        }
+    }
 
     /**
      * Returns an Object from the distributed cache.  The object will be
