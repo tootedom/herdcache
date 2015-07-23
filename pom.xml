@@ -4,7 +4,7 @@
 
     <groupId>org.greencheek.caching</groupId>
     <artifactId>herdcache</artifactId>
-    <version>1.0.23-SNAPSHOT</version>
+    <version>1.0.23</version>
     <packaging>jar</packaging>
 
     <name>herdcache</name>
@@ -35,7 +35,7 @@
         <connection>scm:git:git@github.com:tootedom/herdcache.git</connection>
         <url>scm:git:git@github.com:tootedom/herdcache.git</url>
         <developerConnection>scm:git:git@github.com:tootedom/herdcache.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>herdcache-1.0.23</tag>
     </scm>
 
     <properties>
@@ -339,8 +339,8 @@
                 <configuration>
                     <reuseForks>true</reuseForks>
                     <forkMode>always</forkMode>
-                    <parallel>classes</parallel>
-                    <useUnlimitedThreads>true</useUnlimitedThreads>
+                    <!--<parallel>classes</parallel>-->
+                    <!--<useUnlimitedThreads>true</useUnlimitedThreads>-->
                     <!--
                     Sets the VM argument line used when unit tests are run.
                     Set by jacoco
