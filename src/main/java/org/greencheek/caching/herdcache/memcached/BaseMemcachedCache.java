@@ -1,9 +1,7 @@
 package org.greencheek.caching.herdcache.memcached;
 
-//import com.github.benmanes.caffeine.cache.Caffeine;
-//import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.util.concurrent.*;
-import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
 import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationCompleteNotifier;
@@ -88,12 +86,16 @@ import java.util.function.Supplier;
 
         int maxCapacity = config.getMaxCapacity();
 
-//        this.store = (ConcurrentMap)Caffeine.newBuilder().maximumSize(maxCapacity).initialCapacity(maxCapacity).build().asMap();
-
-        this.store = new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
+        this.store = (ConcurrentMap)Caffeine.newBuilder()
+                .maximumSize(maxCapacity)
                 .initialCapacity(maxCapacity)
-                .maximumWeightedCapacity(maxCapacity)
-                .build();
+                .build()
+                .asMap();
+
+//        this.store = new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
+//                .initialCapacity(maxCapacity)
+//                .maximumWeightedCapacity(maxCapacity)
+//                .build();
 
         int staleCapacity = config.getStaleMaxCapacity();
         if(staleCapacity<=0) {
@@ -109,12 +111,19 @@ import java.util.function.Supplier;
             staleCacheAdditionalTimeToLiveValue = staleDuration;
         }
 
-        staleStore = config.isUseStaleCache() ?
-                new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
-                        .initialCapacity(staleMaxCapacityValue)
-                        .maximumWeightedCapacity(staleMaxCapacityValue)
-                        .build() : null;
+//        staleStore = config.isUseStaleCache() ?
+//                new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
+//                        .initialCapacity(staleMaxCapacityValue)
+//                        .maximumWeightedCapacity(staleMaxCapacityValue)
+//                        .build() : null;
 
+        staleStore = config.isUseStaleCache() ?
+                (ConcurrentMap)Caffeine.newBuilder()
+                        .maximumSize(staleMaxCapacityValue)
+                        .initialCapacity(staleMaxCapacityValue)
+                        .build()
+                        .asMap() :
+                null;
 
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
         if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
@@ -370,9 +379,9 @@ import java.util.function.Supplier;
 
                 V cachedObject = getFromDistributedCache(client,keyString,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
 
-                boolean validCachedObject = (cachedObject != null && isCachedValueValid.test(cachedObject));
+                boolean notValidCachedObject = (cachedObject == null || !isCachedValueValid.test(cachedObject));
 
-                if(!validCachedObject)
+                if(notValidCachedObject)
                 {
                     logger.debug("set requested for {}", keyString);
                     cacheWriteFunction(client, computation, promise,
