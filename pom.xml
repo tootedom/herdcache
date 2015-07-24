@@ -209,7 +209,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.7.1.201405082137</version>
+                <version>0.7.5.201505241946</version>
                 <executions>
                     <!--
                        Prepares the property pointing to the JaCoCo runtime agent which
@@ -228,7 +228,9 @@
                                for JaCoCo runtime agent.
                            -->
                             <propertyName>surefireArgLine</propertyName>
-
+                            <excludes>
+                                <exclude>**com.github.benmanes.caffeine*</exclude>
+                            </excludes>
                         </configuration>
                     </execution>
                     <!--
@@ -338,7 +340,7 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <reuseForks>true</reuseForks>
-                    <forkMode>always</forkMode>
+                    <forkCount>2C</forkCount>
                     <!--<parallel>classes</parallel>-->
                     <!--<useUnlimitedThreads>true</useUnlimitedThreads>-->
                     <!--

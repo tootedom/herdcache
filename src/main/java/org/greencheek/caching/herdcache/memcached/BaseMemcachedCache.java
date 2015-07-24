@@ -12,6 +12,8 @@ import org.greencheek.caching.herdcache.memcached.factory.*;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
+import org.greencheek.caching.herdcache.memcached.callbacks.FailureCallback;
+import org.greencheek.caching.herdcache.memcached.callbacks.SuccessCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +28,7 @@ import java.util.function.Supplier;
  * Created by dominictootell on 23/08/2014.
  */
  class BaseMemcachedCache<V extends Serializable> implements RequiresShutdown,ClearableCache,
-        SerializableOnlyCacheWithExpiry<V>
+        SerializableOnlyCacheWithExpiry<V>, RevalidateInBackgroundCapableCache<V>
          {
 
     public static ConnectionFactory createMemcachedConnectionFactory(MemcachedCacheConfig config) {
@@ -66,6 +68,9 @@ import java.util.function.Supplier;
     private final int staleMaxCapacityValue;
     private final Duration staleCacheAdditionalTimeToLiveValue;
     private final ConcurrentMap<String,ListenableFuture<V>> staleStore;
+    private final ConcurrentMap<String,String> backgroundRevalidationStore;
+
+
 
     private final long memcachedGetTimeoutInMillis;
     private final long staleCacheMemachedGetTimeoutInMillis;
@@ -87,6 +92,12 @@ import java.util.function.Supplier;
         int maxCapacity = config.getMaxCapacity();
 
         this.store = (ConcurrentMap)Caffeine.newBuilder()
+                .maximumSize(maxCapacity)
+                .initialCapacity(maxCapacity)
+                .build()
+                .asMap();
+
+        this.backgroundRevalidationStore = (ConcurrentMap)Caffeine.newBuilder()
                 .maximumSize(maxCapacity)
                 .initialCapacity(maxCapacity)
                 .build()
@@ -340,7 +351,6 @@ import java.util.function.Supplier;
     }
 
 
-
     @Override
     public ListenableFuture<V> apply(String key,
                                      Supplier<V> computation,
@@ -348,7 +358,6 @@ import java.util.function.Supplier;
                                      ListeningExecutorService executorService,
                                      IsSupplierValueCachable<V> canCacheValueEvalutor,IsCachedValueUsable<V> isCachedValueValid) {
         return apply(key,computation,timeToLive,executorService,(Predicate<V>)canCacheValueEvalutor,(Predicate<V>)isCachedValueValid);
-
     }
 
     @Override
@@ -356,7 +365,17 @@ import java.util.function.Supplier;
                                      Supplier<V> computation,
                                      Duration timeToLive,
                                      ListeningExecutorService executorService,
-                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid)
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid) {
+        return this.apply(key, computation, timeToLive, executorService, canCacheValueEvalutor, isCachedValueValid, false);
+    }
+
+    @Override
+    public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     Duration timeToLive,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid,
+                                     boolean returnInvalidCachedItemWhileRevalidate)
     {
 
         String keyString = getHashedKey(key);
@@ -367,7 +386,7 @@ import java.util.function.Supplier;
             return scheduleValueComputation(keyString,computation,executorService);
         }
         else {
-            SettableFuture<V> promise = SettableFuture.create();
+            final SettableFuture<V> promise = SettableFuture.create();
             // create and store a new future for the to be generated value
             // first checking against local a cache to see if the computation is already
             // occurring
@@ -379,18 +398,38 @@ import java.util.function.Supplier;
 
                 V cachedObject = getFromDistributedCache(client,keyString,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
 
-                boolean notValidCachedObject = (cachedObject == null || !isCachedValueValid.test(cachedObject));
+                boolean cachedObjectNotFoundInCache = cachedObject==null;
+                boolean validCachedObject = (!cachedObjectNotFoundInCache && isCachedValueValid.test(cachedObject));
 
-                if(notValidCachedObject)
-                {
+                boolean cacheWriteOccurred = false;
+
+                if(cachedObjectNotFoundInCache) {
+                    // write with normal semantics
                     logger.debug("set requested for {}", keyString);
-                    cacheWriteFunction(client, computation, promise,
-                            keyString,
-                            timeToLive, executorService,
-                            canCacheValueEvalutor);
+                    cacheWriteOccurred = cacheWriteFunction(client, computation, promise,
+                                                           keyString, timeToLive, executorService,
+                                                           canCacheValueEvalutor,
+                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
+                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
                 }
-                else {
-                    removeFutureFromInternalCache(promise,keyString,cachedObject,store);
+                else if(!validCachedObject) {
+                    if (returnInvalidCachedItemWhileRevalidate) {
+                        // return the future, but schedule update in background
+                        // without tying to current future to the background update
+                        //
+                        performBackgroundRevalidationIfNeeded(keyString,client,computation,timeToLive,executorService,canCacheValueEvalutor);
+
+                    } else {
+                        logger.debug("set requested for {}", keyString);
+                        cacheWriteOccurred = cacheWriteFunction(client, computation, promise,keyString,
+                                                               timeToLive, executorService,canCacheValueEvalutor,
+                                (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
+                                (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
+                    }
+                }
+
+                if(cacheWriteOccurred==false) {
+                    removeFutureFromInternalCache(promise, keyString, cachedObject, store);
                 }
                 return promise;
             } else {
@@ -399,6 +438,26 @@ import java.util.function.Supplier;
         }
     }
 
+    private void performBackgroundRevalidationIfNeeded(final String keyString,
+                                                       final ReferencedClient client,
+                                                       final Supplier<V> computation,
+                                                       final Duration timeToLive,
+                                                       final ListeningExecutorService executorService,
+                                                       final Predicate<V> canCacheValueEvalutor) {
+
+        String previousEntry = backgroundRevalidationStore.putIfAbsent(keyString,keyString);
+
+        if(previousEntry!=null) {
+            return;
+        } else {
+            cacheWriteFunction(client, computation, null,
+                    keyString,
+                    timeToLive, executorService,
+                    canCacheValueEvalutor,
+                    (V result) -> backgroundRevalidationStore.remove(keyString),
+                    (Throwable error) -> backgroundRevalidationStore.remove(keyString));
+        }
+    }
 
     private void removeFutureFromInternalCache(SettableFuture<V> promise,String keyString, V cachedObject,
                                                ConcurrentMap<String,ListenableFuture<V>> internalCache) {
@@ -517,17 +576,29 @@ import java.util.function.Supplier;
      * @param promise The promise that is stored in the thurdering herd local cache
      * @param key The key against which to store an item
      * @param itemExpiry the expiry for the item
-     * @return
+     * @return true if the computation has been successfully submitted to the executorService for
+     *              obtaining of the value from the {@code computation}.  false if the computation could not be
+     *              scheduled for computation
      */
-    private void cacheWriteFunction(final ReferencedClient client,
+    private boolean cacheWriteFunction(final ReferencedClient client,
                                                    final Supplier<V> computation,
                                                    final SettableFuture<V> promise,
                                                    final String key,
                                                    final Duration itemExpiry,
                                                    final ListeningExecutorService executorService,
-                                                   final Predicate<V> canCacheValue) {
+                                                   final Predicate<V> canCacheValue,
+                                                   final SuccessCallback<V> successFutureCallBack,
+                                                   final FailureCallback failureFutureCallBack
+
+    ) {
         final long startNanos = System.nanoTime();
-        ListenableFuture<V> computationFuture = executorService.submit(() -> computation.get());
+        ListenableFuture<V> computationFuture = null;
+        try {
+            computationFuture = executorService.submit(() -> computation.get());
+        } catch(Throwable failedToSubmit) {
+            logger.warn("Unable able to submit computation (Supplier) to executor in order to obtain the value for key {}", key,failedToSubmit);
+            return false;
+        }
         Futures.addCallback(computationFuture,
                 new FutureCallback<V>() {
                     @Override
@@ -550,7 +621,7 @@ import java.util.function.Supplier;
                             logger.error("problem setting key {} in memcached", key,e);
                         } finally {
                             metricRecorder.incrementCounter("value_calculation_success");
-                            removeFutureFromInternalCache(promise,key,result,store);
+                            successFutureCallBack.onSuccess(result);
                         }
                     }
 
@@ -558,9 +629,10 @@ import java.util.function.Supplier;
                     public void onFailure(Throwable t) {
                         metricRecorder.incrementCounter("value_calculation_failure");
                         metricRecorder.setDuration("value_calculation",System.nanoTime()-startNanos);
-                        removeFutureFromInternalCacheWithException(promise, key, t, store);
+                        failureFutureCallBack.onFailure(t);
                     }
                 });
+        return true;
     }
 
     private void writeToDistributedStaleCache(ReferencedClient client,String key,Duration ttl,

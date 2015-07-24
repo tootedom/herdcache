@@ -35,6 +35,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
@@ -1145,6 +1147,58 @@ public class TestSimpleMemcachedCaching {
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
+    }
+
+
+    @Test
+    public void testRejectedExecutionIsRemovedFromCache() {
+
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1)));
+        try {
+            cache = new SpyMemcachedCache<>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setMemcachedHosts("localhost:" + memcached.getPort())
+                            .setTimeToLive(Duration.ofSeconds(60))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .setKeyHashType(KeyHashingType.MD5_LOWER)
+                            .buildMemcachedConfig()
+            );
+
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return largeCacheValue;
+            }, executorService);
+
+            ListenableFuture<String> val2 = cache.apply("Key2", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2";
+            }, executorService);
+
+
+            ListenableFuture<String> val3 = cache.apply("Key3", () -> "value3", executorService);
+            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should for key2 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
+            assertEquals("Value should for key3 should be null", null, cache.awaitForFutureOrElse(val3, null));
+
+            ListenableFuture<String> val3again = cache.apply("Key3", () -> "value3", executorService);
+            assertEquals("Value should for key3 should be value3", "value3", cache.awaitForFutureOrElse(val3again,"exception", "timeout",1000,TimeUnit.MILLISECONDS));
+
+            assertEquals(3, memcached.getDaemon().getCache().getCurrentItems());
+        }
+        finally {
+            executorService.shutdownNow();
+        }
     }
 
     @Test
