@@ -11,6 +11,8 @@ import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.Cache;
 import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
+import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
+import org.greencheek.caching.herdcache.exceptions.UnableToSubmitSupplierForExecutionException;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
@@ -34,10 +36,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
@@ -1197,6 +1196,142 @@ public class TestSimpleMemcachedCaching {
             assertEquals(3, memcached.getDaemon().getCache().getCurrentItems());
         }
         finally {
+            executorService.shutdownNow();
+        }
+    }
+
+
+    @Test(expected=UnableToSubmitSupplierForExecutionException.class)
+    public void testRejectedExecutionThrowsException() throws Throwable {
+
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1)));
+        try {
+            cache = new SpyMemcachedCache<>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setMemcachedHosts("localhost:" + memcached.getPort())
+                            .setTimeToLive(Duration.ofSeconds(60))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .setKeyHashType(KeyHashingType.MD5_LOWER)
+                            .buildMemcachedConfig()
+            );
+
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return largeCacheValue;
+            }, executorService);
+
+            ListenableFuture<String> val2 = cache.apply("Key2", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2";
+            }, executorService);
+
+
+            ListenableFuture<String> val3 = cache.apply("Key3", () -> "value3", executorService);
+            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should for key2 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
+            assertEquals("Value should for key3 should be null", null, val3.get());
+        } catch (Exception e) {
+            throw e.getCause();
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+
+    public static class ApplicationException extends RuntimeException {
+
+    }
+
+    @Test(expected=ApplicationException.class)
+    public void testApplicationExceptionIsPropagatedToCaller() throws Throwable {
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1)));
+        try {
+            cache = new SpyMemcachedCache<>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setMemcachedHosts("localhost:" + memcached.getPort())
+                            .setTimeToLive(Duration.ofSeconds(60))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .setKeyHashType(KeyHashingType.MD5_LOWER)
+                            .buildMemcachedConfig()
+            );
+
+            // Submit an item to the cache "Key1" is executing
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                throw new ApplicationException();
+            }, executorService);
+
+            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, val.get());
+        } catch (Exception e) {
+            throw e.getCause();
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test(expected=UnableToScheduleCacheGetExecutionException.class)
+    public void testRejectedExecutionInGetThrowsException() throws Throwable {
+
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1)));
+        try {
+            cache = new SpyMemcachedCache<>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setMemcachedHosts("localhost:" + memcached.getPort())
+                            .setTimeToLive(Duration.ofSeconds(60))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .setKeyHashType(KeyHashingType.MD5_LOWER)
+                            .buildMemcachedConfig()
+            );
+
+            // Submit an item to the cache "Key1" is executing
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return largeCacheValue;
+            }, executorService);
+
+            // Submit an item to the cache "Key2" is queued
+            ListenableFuture<String> val2 = cache.apply("Key2", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2";
+            }, executorService);
+
+
+            // Submit a GET, this will be rejected as Key1 is executing, the Key2 is filling the queue
+            // The rejection is set on the ListenableFuture, so when you do to .get() it will throw an exception.
+            ListenableFuture<String> val3 = cache.get("Key3", executorService);
+
+            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should for key2 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
+
+            // Throws the excpetion
+            assertEquals("Value should for key3 should be null", null, val3.get());
+        } catch (Exception e) {
+            throw e.getCause();
+        } finally {
             executorService.shutdownNow();
         }
     }
