@@ -402,6 +402,16 @@ import java.util.function.Supplier;
         return this.apply(key, computation, timeToLive, executorService, canCacheValueEvalutor, isCachedValueValid, false);
     }
 
+
+    @Override
+    public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid,
+                                     boolean returnInvalidCachedItemWhileRevalidate) {
+        return apply(key,computation,config.getTimeToLive(),executorService,canCacheValueEvalutor,isCachedValueValid,returnInvalidCachedItemWhileRevalidate);
+    }
+
     @Override
     public ListenableFuture<V> apply(String key,
                                      Supplier<V> computation,

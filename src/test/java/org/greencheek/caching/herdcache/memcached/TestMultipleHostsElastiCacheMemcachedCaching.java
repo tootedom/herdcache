@@ -172,6 +172,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
                             .setTimeToLive(Duration.ofSeconds(2))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                             .setWaitForMemcachedSet(true)
+                            .setSetWaitDuration(Duration.ofSeconds(5))
                             .setHashAlgorithm(algo)
                             .setDelayBeforeClientClose(Duration.ofSeconds(1))
                             .setDnsConnectionTimeout(Duration.ofSeconds(2))
