@@ -38,7 +38,7 @@ The below details how to use the caching implementations, the differences betwee
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.14</version>
+  <version>1.0.26</version>
 </dependency>
 ----
 
@@ -1104,9 +1104,91 @@ Ray Stantz: Total protonic reversal!
 Venkman: Right. That's bad. Okay. All right. Important safety tip. Thanks, Egon.
 ----
 
+Is your `Supplier<V>` is a HystrixCommand, and you have coded it's fallback method to take a reference to the Cache object,
+and perform a `cache.get()` of the same key for which the cache `apply` is running and executing the HystrixCommand, then you
+are guaranteed failure.
+
+For example, do not do this in a HystrixCommand for the same `key` that the cache apply is running for.:
+
+[source,java]
+----
+    @Override
+    protected CacheableItemWithCreationDate<V> getFallback() {
+        CacheableItemWithCreationDate<V> contentObj = null;
+
+        try {
+            contentObj = cache.get(cacheKey).get();
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        return contentObj;
+    }
+----
+
+The reason for this is that if your HystrixComamnd's execute is running as the implmentation of the `Supplier<V>` interface.The your Hystrix Command’s run()
+method via the hystrix execute() method. The `HystrixCommand` (`Supplier<V>`) is executing in a (asynchronous) Future<V> within herdcache.
+This `Future<V>` is stored in an internal map in herdcache as a thundering herd mechanism (https://github.com/tootedom/herdcache#overview),
+under the key you are looking up.
+
+The Future<V> exists in the internal map, keyed on the given key, until the `Supplier<V>` command effectively returns a value.
+For a HystrixCommand's `execute()` method, the resulting value is either from the commands run() method or its getFallback().
+
+The problem here is that if you call in your command’s getFallback() the `cache.get(key)` method you are still "effectively"
+in the execute() method, and the `Future<V>` is yet complete (it is still waiting to generate a value from run() or getFallback()).
+The cache.get(cacheKey).get() will be waiting on exactly the same Future object that was created by herdcache when it
+initially executed the `Supplier<V>`  (The HystrixCommand's `execute()` method).  The cache.get(cacheKey).get(); checks
+the internal map for an already executing Future that mapped to the given key:
+
+In other words:
+
+* The Supplier<V> (HystrixCommand's `run()`) is executing in a Future.  Say Future X. This Future X is stored in a Map<String,Future> internally in herdcache, keyed on PID_XYZ
+
+* If run() fails, this will result in the HystrixCommand's getFallback() being called.
+
+* If getFallback() this invokes cache.get("PID_XYZ").  Then the future previously stored in the Map, keyed on "PID_XYZ", is returned from the Map.
+
+* This is the same Future that is executing run().
+
+* As a result what you effectively have is a loop.
 
 
 '''
+
+==== Return Invalid Object Whilst Revalidate
+
+This is technically an alternate implementation of the stale-while-revalidate pattern.  This feature is available in
+herdcache version `1.0.26`, and is a implemented with in the interface `RevalidateInBackgroundCapableCache`.  This interface
+extends the `CacheWithExpiry` interface with an additional parameter `returnInvalidCachedItemWhileRevalidate` on
+the `apply(...)` method:
+
+[source,java]
+----
+  public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     Duration timeToLive,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid,
+                                     boolean returnInvalidCachedItemWhileRevalidate);
+
+
+  public ListenableFuture<V> apply(String key,
+                                     Supplier<V> computation,
+                                     ListeningExecutorService executorService,
+                                     Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueValid,
+                                     boolean returnInvalidCachedItemWhileRevalidate);
+----
+
+
+The flow of the apply method, when `returnInvalidCachedItemWhileRevalidate` is `true`, is as follows:
+
+* An item is found in the cache
+* The item is passed to the `Predicate<V>` isCachedValueValid
+* If the `isCachedValueValid` predicate returns true then the cache value if returned.
+* However, if the `isCachedValueValid` predicate returns false then the "invalid" value is returned (set on the Future<V>),
+while the `Supplier<V>` computation is submitted to the `executorService` in order to refresh the item in the cache.
+
+''''
+
 
 ==== Example Simple ElastiCache Test Class
 
