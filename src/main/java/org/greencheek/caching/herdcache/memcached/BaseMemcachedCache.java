@@ -57,7 +57,6 @@ import java.util.function.Supplier;
     public static final String CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER = "value_calculation_success";
     public static final String CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER = "value_calculation_failure";
     public static final String CACHE_TYPE_STALE_VALUE_CALCULATION = "stale_value_calculation_cache";
-    public static final String CACHE_TYPE_STALE_VALUE_CALCULATION_REJECTION = "stale_value_calculation_cache_rejection";
     public static final String CACHE_TYPE_CACHE_DISABLED = "disabled_cache";
     public static final String CACHE_TYPE_CACHE_DISABLED_REJECTION = "disabled_cache";
 
@@ -227,12 +226,12 @@ import java.util.function.Supplier;
             if(waitForMemcachedSet) {
                 try {
                     futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
-                } catch (Exception e) {
-                    logger.warn("Exception waiting for memcached set to occur", e);
+                } catch (Throwable e) {
+                    logger.warn("Exception waiting for memcached set to occur for key {}",key, e);
                 }
             }
-        } catch (Exception e) {
-             logger.warn("Exception performing memcached set", e);
+        } catch (Throwable e) {
+             logger.warn("Exception performing memcached set for key {}",key, e);
         }
     }
 
@@ -261,19 +260,27 @@ import java.util.function.Supplier;
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {
             logCacheMiss(key,CACHE_TYPE_CACHE_DISABLED);
-            ListenableFuture<V> computationFuture = null;
             try {
-                computationFuture = executorService.submit(() -> computation.get());
+                executorService.submit(
+                        () -> {
+                            CacheRequestFutureComputationCompleteNotifier notifier = new CacheRequestFutureComputationCompleteNotifier<V>(key,
+                                    toBeComputedFuture, failureHandler,
+                                    (V result) -> store.remove(key));
+
+                            V results = null;
+                            try {
+                                results = computation.get();
+                                notifier.onSuccess(results);
+                            } catch(Throwable e) {
+                                notifier.onFailure(e);
+                            }
+                            return results;
+                        });
             } catch(Throwable failedToSubmit) {
                 metricRecorder.incrementCounter(CACHE_TYPE_CACHE_DISABLED_REJECTION);
                 logger.warn("Unable able to submit computation (Supplier) to executor in order to obtain the value for key {}", key, failedToSubmit);
                 toBeComputedFuture.setException(failedToSubmit);
             }
-
-            Futures.addCallback(computationFuture,
-                    new CacheRequestFutureComputationCompleteNotifier<V>(key,
-                            toBeComputedFuture, failureHandler,
-                            (V result) -> store.remove(key)));
 
 
             return toBeComputedFuture;
@@ -283,9 +290,14 @@ import java.util.function.Supplier;
         }
     }
 
-    private ListenableFuture<V> getFromDistributedCache(ReferencedClient client,String key,ListeningExecutorService ec) {
+    private ListenableFuture<V> getFromDistributedCache(final ReferencedClient client,
+                                                        final String key,
+                                                        final ListeningExecutorService ec) {
         try {
-            return ec.submit(() -> getFromDistributedCache(client, key, memcachedGetTimeoutInMillis, CACHE_TYPE_DISTRIBUTED_CACHE));
+            return ec.submit(
+                            createGetFromDistributedCacheCallable(() -> getFromDistributedCache(client, key, memcachedGetTimeoutInMillis, CACHE_TYPE_DISTRIBUTED_CACHE),
+                                    key)
+                    );
         } catch(Throwable failedToSubmit) {
             final SettableFuture<V> promise = SettableFuture.create();
             metricRecorder.incrementCounter(CACHE_TYPE_DISTRIBUTED_CACHE_REJECTION);
@@ -321,13 +333,12 @@ import java.util.function.Supplier;
             if(future==null) {
                 logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
                 ListenableFuture<V> futureForCacheLookup = getFromDistributedCache(client,keyString,executorService);
-                addCacheLookupMetricsCallback(futureForCacheLookup,keyString);
                 return futureForCacheLookup;
             }
             else {
                 logCacheHit(keyString, CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
-                    return getFutureForStaleDistributedCacheLookup(client, createStaleCacheKey(keyString), future, executorService);
+                    return getFutureForStaleDistributedCacheLookup(client, createStaleCacheKey(keyString), future);
                 } else {
                     return future;
                 }
@@ -335,24 +346,24 @@ import java.util.function.Supplier;
         }
     }
 
-    private void addCacheLookupMetricsCallback(final ListenableFuture<V> futureForCacheLookup, final String keyString) {
-        Futures.addCallback(futureForCacheLookup,
-                new FutureCallback<V>() {
-                    @Override
-                    public void onSuccess(V result) {
-                        if(result==null) {
-                            logCacheMiss(keyString,CACHE_TYPE_ALL);
-                        } else {
-                            logCacheHit(keyString, CACHE_TYPE_ALL);
-                        }
-                    }
+    private Callable<V> createGetFromDistributedCacheCallable(final Supplier<V> supplier, final String keyString) {
+        return () -> {
+            boolean ok = false;
+            V result = null;
+            try {
+                result = supplier.get();
+                ok = true;
+            } catch (Throwable throwable) {
+                ok = false;
+            }
 
-                    @Override
-                    public void onFailure(Throwable t) {
-                        logCacheMiss(keyString, CACHE_TYPE_ALL);
-                    }
-                });
-
+            if(ok && result!=null) {
+                logCacheHit(keyString, CACHE_TYPE_ALL);
+            } else {
+                logCacheMiss(keyString,CACHE_TYPE_ALL);
+            }
+            return result;
+        };
     }
 
     @Override
@@ -555,25 +566,27 @@ import java.util.function.Supplier;
         logCacheHit(keyRequested, CACHE_TYPE_VALUE_CALCULATION);
         if(config.isUseStaleCache()) {
             String staleCacheKey = createStaleCacheKey(keyRequested);
-            return getFutureForStaleDistributedCacheLookup(client, staleCacheKey, cachedFuture, executor);
+            return getFutureForStaleDistributedCacheLookup(client, staleCacheKey, cachedFuture);
         } else {
             return cachedFuture;
         }
     }
 
     /**
-     * returns a future that is consulting the stale memcached cache.  If the item is not in the
-     * cache, the backendFuture will be invoked (complete the operation).
+     * Returns a future that either:
+     * <ul>
+     *     <li>contains the stale value from memcached</li>
+     *     <li>the future that is calculating the value from the given supplier (this future is already executing)</li>
+     * </ul>
+     *
      *
      * @param key The stale cache key
      * @param backendFuture The future that is actually calculating the fresh cache entry
-     * @param ec  The require execution context to run the stale cache key.
-     * @return  A future that will result in the stored Serializable object
+     * @return  A future that will contain the result
      */
     private ListenableFuture<V> getFutureForStaleDistributedCacheLookup(ReferencedClient client,
                                                                         String key,
-                                                                        ListenableFuture<V> backendFuture,
-                                                                        ListeningExecutorService ec) {
+                                                                        ListenableFuture<V> backendFuture) {
 
         // protection against thundering herd on stale memcached
         SettableFuture<V> promise = SettableFuture.create();
@@ -582,58 +595,81 @@ import java.util.function.Supplier;
 
         if (existingFuture == null) {
             logCacheMiss(key, BaseMemcachedCache.CACHE_TYPE_STALE_VALUE_CALCULATION);
-            try {
-                ec.submit(() -> getFromStaleDistributedCache(client,key, promise, backendFuture));
-            } catch(Throwable failedToSubmit) {
-                metricRecorder.incrementCounter(CACHE_TYPE_STALE_VALUE_CALCULATION_REJECTION);
-                String message =  "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
-                logger.warn(message, failedToSubmit);
-                removeFutureFromInternalCacheWithException(promise, key, new UnableToScheduleCacheGetExecutionException(message,failedToSubmit), staleStore);
+
+            V item = getFromDistributedCache(client, key, this.staleCacheMemachedGetTimeoutInMillis, CACHE_TYPE_STALE_CACHE);
+
+            if(item==null) {
+                removeFutureFromInternalCache(promise, key, null, staleStore);
+                return backendFuture;
+            } else {
+                removeFutureFromInternalCache(promise, key, item, staleStore);
+                return promise;
             }
-            return promise;
-        }
-        else {
-            logCacheHit(key, BaseMemcachedCache.CACHE_TYPE_STALE_VALUE_CALCULATION);
-            return existingFuture;
-        }
-    }
-
-    /**
-     * Talks to memcached to find a cached entry. If the entry does not exist, the backend Future will
-     * be 'consulted' and it's value with be returned.
-     *
-     * @param key The cache key to lookup
-     * @param promise the promise on which requests are waiting.
-     * @param backendFuture the future that is running the long returning calculation that creates a fresh entry.
-     */
-    private void getFromStaleDistributedCache(final ReferencedClient client,
-                                              final String key,
-                                              final SettableFuture<V> promise,
-                                              final ListenableFuture<V> backendFuture) {
-
-        V item = getFromDistributedCache(client,key,this.staleCacheMemachedGetTimeoutInMillis, CACHE_TYPE_STALE_CACHE);
-
-        if(item==null) {
-            Futures.addCallback(backendFuture, new FutureCallback<V>() {
-                        @Override
-                        public void onSuccess(V result) {
-                            removeFutureFromInternalCache(promise,key,result,staleStore);
-                        }
-
-                        @Override
-                        public void onFailure(Throwable t) {
-                            removeFutureFromInternalCacheWithException(promise, key, t, staleStore);
-                        }
-                    });
 
         } else {
-            removeFutureFromInternalCache(promise,key,(V)item,staleStore);
+            logCacheHit(key, BaseMemcachedCache.CACHE_TYPE_STALE_VALUE_CALCULATION);
+            try {
+                V item = promise.get();
+                if(item==null) {
+                    return backendFuture;
+                } else {
+                    return promise;
+                }
+            } catch (Throwable e) {
+                return backendFuture;
+            }
         }
-
     }
 
 
+    private Callable<V> createCacheWriteCallable(final ReferencedClient client,
+                                                 final Supplier<V> computation,
+                                                 final String key,
+                                                 final Duration itemExpiry,
+                                                 final Predicate<V> canCacheValue,
+                                                 final SuccessCallback<V> successFutureCallBack,
+                                                 final FailureCallback failureFutureCallBack) {
+        return () -> {
+            final long startNanos =  System.nanoTime();
+            boolean ok = false;
+            V results = null;
+            Throwable throwable = null;
+            try {
+                results = computation.get();
+                ok = true;
+            } catch(Throwable err){
+                throwable = err;
+            } finally {
+                long time = System.nanoTime()-startNanos;
+                metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
 
+                if(ok) {
+                    metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,time);
+
+                    if (results != null) {
+                        if (canCacheValue.test(results)) {
+                            writeToDistributedStaleCache(client, key, itemExpiry, results);
+                            // write the cache entry
+                            writeToDistributedCache(client, key, results, itemExpiry, config.isWaitForMemcachedSet());
+                        } else {
+                            logger.debug("Cache Value cannot be cached, as determine by predicate. Therefore, not storing in memcached");
+                        }
+                    } else {
+                        logger.debug("Cache Value computation was null, not storing in memcached");
+                    }
+
+                    metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+                    successFutureCallBack.onSuccess(results);
+
+                } else {
+                    metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
+                    metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
+                    failureFutureCallBack.onFailure(throwable);
+                }
+                return results;
+            }
+        };
+    }
     /**
      * write to memcached when the future completes, the generated value,
      * against the given key, with the specified expiry
@@ -654,53 +690,17 @@ import java.util.function.Supplier;
                                                    final FailureCallback failureFutureCallBack
 
     ) {
-        final long startNanos = System.nanoTime();
-        ListenableFuture<V> computationFuture;
         try {
-            computationFuture = executorService.submit(() -> computation.get());
+            executorService.submit(
+                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,successFutureCallBack,failureFutureCallBack));
+
         } catch(Throwable failedToSubmit) {
             metricRecorder.incrementCounter("value_calculation_rejected_execution");
             String message = "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
             logger.warn(message,failedToSubmit);
             return new UnableToSubmitSupplierForExecutionException(message,failedToSubmit);
         }
-        Futures.addCallback(computationFuture,
-                new FutureCallback<V>() {
-                    @Override
-                    public void onSuccess(V result) {
-                        try {
-                            long time = System.nanoTime()-startNanos;
-                            metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
-                            metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,time);
-                            if(result!=null) {
-                                if(canCacheValue.test(result)) {
-                                    writeToDistributedStaleCache(client, key, itemExpiry, result);
-                                    // write the cache entry
-                                    writeToDistributedCache(client, key, result, itemExpiry, config.isWaitForMemcachedSet());
-                                } else {
-                                    logger.debug("Cache Value cannot be cached, as determine by predicate. Therefore, not storing in memcached");
-                                }
-                            } else {
-                                logger.debug("Cache Value computation was null, not storing in memcached");
-                            }
 
-                        } catch (Exception e) {
-                            logger.error("problem setting key {} in memcached", key,e);
-                        } finally {
-                            metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
-                            successFutureCallBack.onSuccess(result);
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Throwable t) {
-                        long time = System.nanoTime()-startNanos;
-                        metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
-                        metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
-                        metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
-                        failureFutureCallBack.onFailure(t);
-                    }
-                });
         return null;
     }
 
