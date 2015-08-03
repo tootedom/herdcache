@@ -347,7 +347,7 @@
                     Sets the VM argument line used when unit tests are run.
                     Set by jacoco
                      -->
-                    <argLine>${surefireArgLine} -Dio.netty.leakDetectionLevel=paranoid</argLine>
+                    <argLine>${surefireArgLine} -Dio.netty.leakDetectionLevel=paranoid -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SLF4JLogger</argLine>
                     <!-- Skips unit tests if the value of skip.unit.tests property is true -->
                     <skipTests>${skip.unit.tests}</skipTests>
                     <!-- Excludes integration tests when unit tests are run. -->

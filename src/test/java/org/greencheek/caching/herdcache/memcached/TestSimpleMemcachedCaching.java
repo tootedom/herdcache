@@ -16,8 +16,8 @@ import org.greencheek.caching.herdcache.exceptions.UnableToSubmitSupplierForExec
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.SerializingTranscoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.SerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;

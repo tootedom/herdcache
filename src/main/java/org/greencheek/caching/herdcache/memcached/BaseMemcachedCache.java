@@ -56,6 +56,7 @@ import java.util.function.Supplier;
     public static final String CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER = "value_calculation_failure_latency";
     public static final String CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER = "value_calculation_success";
     public static final String CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER = "value_calculation_failure";
+    public static final String CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER= "value_calculation_rejected_execution";
     public static final String CACHE_TYPE_STALE_VALUE_CALCULATION = "stale_value_calculation_cache";
     public static final String CACHE_TYPE_CACHE_DISABLED = "disabled_cache";
     public static final String CACHE_TYPE_CACHE_DISABLED_REJECTION = "disabled_cache";
@@ -458,46 +459,39 @@ import java.util.function.Supplier;
 
                 V cachedObject = getFromDistributedCache(client,keyString,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
 
-                boolean cachedObjectNotFoundInCache = cachedObject==null;
-                boolean validCachedObject = (!cachedObjectNotFoundInCache && isCachedValueValid.test(cachedObject));
+                boolean cachedObjectFoundInCache = cachedObject!=null;
+                boolean validCachedObject = (cachedObjectFoundInCache && isCachedValueValid.test(cachedObject));
+                boolean doRevalidationInBackground = returnInvalidCachedItemWhileRevalidate && cachedObjectFoundInCache && !validCachedObject;
 
-                Throwable exceptionDuringWrite = null;
-                if(cachedObjectNotFoundInCache) {
-                    // write with normal semantics
-                    logger.debug("set requested for {}", keyString);
-                    logCacheMiss(keyString, CACHE_TYPE_ALL);
-                    exceptionDuringWrite = cacheWriteFunction(client, computation,
-                                                           keyString, timeToLive, executorService,
-                                                           canCacheValueEvalutor,
-                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
-                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
-                }
-                else if(!validCachedObject) {
-                    if (returnInvalidCachedItemWhileRevalidate) {
-                        // return the future, but schedule update in background
-                        // without tying to current future to the background update
-                        //
-                        logCacheHit(keyString, CACHE_TYPE_ALL);
-                        performBackgroundRevalidationIfNeeded(keyString, client, computation, timeToLive, executorService, canCacheValueEvalutor);
-                        removeFutureFromInternalCache(promise, keyString, cachedObject, store);
-
-                    } else {
-                        logger.debug("set requested for {}", keyString);
-                        logCacheMiss(keyString, CACHE_TYPE_ALL);
-                        exceptionDuringWrite = cacheWriteFunction(client, computation,keyString,
-                                                               timeToLive, executorService,canCacheValueEvalutor,
-                                (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
-                                (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
-                    }
-                } else {
+                if(validCachedObject) {
                     logCacheHit(keyString,CACHE_TYPE_ALL);
                     removeFutureFromInternalCache(promise, keyString, cachedObject, store);
                 }
-
-                if(exceptionDuringWrite!=null) {
-                    removeFutureFromInternalCacheWithException(promise, keyString, exceptionDuringWrite, store);
+                else if (doRevalidationInBackground) {
+                    // return the future, but schedule update in background
+                    // without tying to current future to the background update
+                    //
+                    logCacheHit(keyString, CACHE_TYPE_ALL);
+                    performBackgroundRevalidationIfNeeded(keyString, client, computation, timeToLive, executorService, canCacheValueEvalutor);
+                    removeFutureFromInternalCache(promise, keyString, cachedObject, store);
                 }
+                else {
+                    // write with normal semantics
+                    logger.debug("set requested for {}", keyString);
+                    logCacheMiss(keyString, CACHE_TYPE_ALL);
+                    Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
+                            keyString, timeToLive, executorService,
+                            canCacheValueEvalutor,
+                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
+                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
+
+                    if(exceptionDuringWrite!=null) {
+                        removeFutureFromInternalCacheWithException(promise, keyString, exceptionDuringWrite, store);
+                    }
+                }
+
                 return promise;
+
             } else {
                 return returnStaleOrCachedItem(client,keyString,existingFuture,executorService);
             }
@@ -695,7 +689,7 @@ import java.util.function.Supplier;
                     createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,successFutureCallBack,failureFutureCallBack));
 
         } catch(Throwable failedToSubmit) {
-            metricRecorder.incrementCounter("value_calculation_rejected_execution");
+            metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER);
             String message = "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
             logger.warn(message,failedToSubmit);
             return new UnableToSubmitSupplierForExecutionException(message,failedToSubmit);
@@ -707,7 +701,7 @@ import java.util.function.Supplier;
     private void writeToDistributedStaleCache(ReferencedClient client,String key,Duration ttl,
                                    V valueToWriteToCache) {
         if (config.isUseStaleCache()) {
-            String staleCacheKey =  createStaleCacheKey(key);;
+            String staleCacheKey =  createStaleCacheKey(key);
             Duration staleCacheExpiry = ttl.plus(staleCacheAdditionalTimeToLiveValue);
             // overwrite the stale cache entry
             writeToDistributedCache(client, staleCacheKey, valueToWriteToCache, staleCacheExpiry, false);

@@ -1,47 +1,25 @@
 package org.greencheek.caching.herdcache.memcached;
 
-import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.netflix.hystrix.HystrixCommand;
 import net.spy.memcached.ConnectionFactoryBuilder;
-import net.spy.memcached.HashAlgorithm;
-import org.greencheek.caching.herdcache.Cache;
-import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.RevalidateInBackgroundCapableCache;
 import org.greencheek.caching.herdcache.domain.CacheableItemWithCreationDate;
-import org.greencheek.caching.herdcache.exceptions.UnableToSubmitSupplierForExecutionException;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
-import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.SerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
-import org.greencheek.caching.herdcache.util.BackEndRequest;
-import org.greencheek.caching.herdcache.util.Content;
-import org.greencheek.caching.herdcache.util.RestClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.Serializable;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;

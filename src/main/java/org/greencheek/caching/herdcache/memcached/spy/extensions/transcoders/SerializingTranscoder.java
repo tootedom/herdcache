@@ -20,11 +20,12 @@
  * IN THE SOFTWARE.
  */
 
-package org.greencheek.caching.herdcache.memcached.spy.extensions;
+package org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders;
 
 import net.spy.memcached.CachedData;
 import net.spy.memcached.transcoders.Transcoder;
 import net.spy.memcached.transcoders.TranscoderUtils;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,8 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
 
   private static final Logger logger = LoggerFactory.getLogger(SerializingTranscoder.class);
 
-  public static final int MAX_CONTENT_SIZE_IN_BYTES = CachedData.MAX_SIZE;
+  // Max size of content stored in bytes
+  public static final int MAX_CONTENT_SIZE_IN_BYTES = 50 * 1024 * 1024;
   // General flags
   static final int SERIALIZED = 1;
   static final int COMPRESSED = 2;
@@ -71,10 +73,15 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
   }
 
   public SerializingTranscoder(int maxContentLength,int compressionThresholdInBytes) {
-      super(maxContentLength,compressionThresholdInBytes);
+      this(maxContentLength,compressionThresholdInBytes,DEFAULT_COMPRESSOR);
   }
 
-  @Override
+  public SerializingTranscoder(int maxContentLength,int compressionThresholdInBytes,Compression compressor) {
+      super(maxContentLength,compressionThresholdInBytes,compressor);
+  }
+
+
+    @Override
   public boolean asyncDecode(CachedData d) {
     if ((d.getFlags() & COMPRESSED) != 0 || (d.getFlags() & SERIALIZED) != 0) {
       return true;
@@ -170,7 +177,7 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
       flags |= SERIALIZED;
     }
     assert b != null;
-    if (b.length > compressionThreshold) {
+    if (b.length > getCompressionThreshold()) {
       byte[] compressed = compress(b);
       if (compressed.length < b.length) {
         logger.debug("Compressed {} from {} to {}",

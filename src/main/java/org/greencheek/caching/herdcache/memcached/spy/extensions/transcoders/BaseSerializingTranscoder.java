@@ -21,12 +21,15 @@
  * IN THE SOFTWARE.
  */
 
-package org.greencheek.caching.herdcache.memcached.spy.extensions;
+package org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders;
 
 import net.spy.memcached.CachedData;
 import net.spy.memcached.compat.CloseUtil;
 import net.spy.memcached.compat.SpyObject;
 
+import org.greencheek.caching.herdcache.memcached.spy.extensions.ClassLoaderObjectInputStream;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.SnappyCompression;
 import org.greencheek.caching.herdcache.memcached.util.ResizableByteBufferNoBoundsCheckingBackedOutputStream;
 import org.greencheek.caching.herdcache.memcached.util.ThreadUnsafeByteArrayInputStream;
 import org.slf4j.Logger;
@@ -45,19 +48,22 @@ import java.io.UnsupportedEncodingException;
 public abstract class BaseSerializingTranscoder extends SpyObject {
 
     private static Logger logger = LoggerFactory.getLogger(BaseSerializingTranscoder.class);
+
     /**
      * Default compression threshold value.
      */
-    public static final int DEFAULT_COMPRESSION_THRESHOLD = 8192;
+    public static final int DEFAULT_COMPRESSION_THRESHOLD = 4096;
+
+    public static final Compression DEFAULT_COMPRESSOR = new SnappyCompression();
 
     private static final String DEFAULT_CHARSET = "UTF-8";
 
-    protected int compressionThreshold;
-    protected String charset = DEFAULT_CHARSET;
-
+    private final int compressionThreshold;
+    private final String charset = DEFAULT_CHARSET;
     private final int maxSize;
 
 
+    private final Compression compressor;
     /**
      * Initialize a serializing transcoder with the given maximum data size.
      */
@@ -66,36 +72,18 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
     }
 
     public BaseSerializingTranscoder(int maxContentLength, int compressionThreshold) {
+        this(maxContentLength,compressionThreshold,DEFAULT_COMPRESSOR);
+    }
+
+    public BaseSerializingTranscoder(int maxContentLength, int compressionThreshold, Compression compression) {
         super();
         this.maxSize = maxContentLength;
         this.compressionThreshold = compressionThreshold;
+        this.compressor = compression;
     }
 
     public boolean asyncDecode(CachedData d) {
         return false;
-    }
-
-    /**
-     * Set the compression threshold to the given number of bytes. This transcoder
-     * will attempt to compress any data being stored that's larger than this.
-     *
-     * @param to the number of bytes
-     */
-    public void setCompressionThreshold(int to) {
-        compressionThreshold = to;
-    }
-
-    /**
-     * Set the character set for string value transcoding (defaults to UTF-8).
-     */
-    public void setCharset(String to) {
-        // Validate the character set.
-        try {
-            new String(new byte[97], to);
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-        charset = to;
     }
 
     /**
@@ -156,18 +144,7 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
      * Compress the given array of bytes.
      */
     protected byte[] compress(byte[] in) {
-        if (in == null) {
-            throw new NullPointerException("Can't compress null");
-        }
-
-        byte[] compressed;
-        try {
-            compressed = Snappy.compress(in);
-        } catch (Exception e) {
-            throw new RuntimeException("IO exception compressing data", e);
-        }
-        logger.debug("Compressed {} bytes to {}", in.length, compressed.length);
-        return compressed;
+        return compressor.compress(in);
     }
 
     /**
@@ -176,16 +153,7 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
      * @return null if the bytes cannot be decompressed
      */
     protected byte[] decompress(byte[] in) {
-        byte[] decompressed = null;
-        if (in != null) {
-            try {
-                decompressed = Snappy.uncompress(in);
-            } catch (Exception e) {
-                logger.warn("Failed to decompress data", e);
-                return null;
-            }
-        }
-        return decompressed;
+        return compressor.decompress(in);
     }
 
     /**
@@ -218,5 +186,9 @@ public abstract class BaseSerializingTranscoder extends SpyObject {
 
     public int getMaxSize() {
         return maxSize;
+    }
+
+    public int getCompressionThreshold() {
+        return compressionThreshold;
     }
 }

@@ -1338,4 +1338,9 @@ o.g.c.h.p.b.compression.SnappyPerfTest.iq80Compresss                            
 o.g.c.h.p.b.compression.SnappyPerfTest.iq80Decompresss                                    thrpt   40  162.476 ±  3.815  ops/ms
 o.g.c.h.p.b.compression.SnappyPerfTest.xerialCompress                                     thrpt   40  105.303 ±  2.542  ops/ms
 o.g.c.h.p.b.compression.SnappyPerfTest.xerialDecompress                                   thrpt   40  173.413 ±  6.217  ops/ms
+
+LZ4PerfTest.compress                             thrpt   40  138.716 ± 1.626  ops/ms
+LZ4PerfTest.compressAndDecompress                thrpt   40   98.266 ± 1.031  ops/ms
+SnappyCompressionPerfTest.compress               thrpt   40  109.232 ± 4.480  ops/ms
+SnappyCompressionPerfTest.compressAndDecompress  thrpt   40   72.289 ± 0.820  ops/ms
 ----

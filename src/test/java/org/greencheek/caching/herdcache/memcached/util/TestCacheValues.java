@@ -470,5 +470,8 @@ public class TestCacheValues {
         LARGE_CACHE_VALUE_BYTES = content;
     }
 
+
+    public static String LARGE_CACHE_VALUE2 = LARGE_CACHE_VALUE + LARGE_CACHE_VALUE;
+
     public static final byte[] LARGE_COMPRESSED_BYTES = org.iq80.snappy.Snappy.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);
 }

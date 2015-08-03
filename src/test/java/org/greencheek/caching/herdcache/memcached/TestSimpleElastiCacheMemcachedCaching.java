@@ -9,9 +9,6 @@ import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.server.StringServer;
-import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.SerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
@@ -21,9 +18,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.Serializable;
 import java.time.Duration;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 

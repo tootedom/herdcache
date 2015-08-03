@@ -10,7 +10,11 @@ import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.metrics.NoOpMetricRecorder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.FastSerializingTranscoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.CompressionAlgorithm;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.LZ4NativeCompression;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.SnappyCompression;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -67,6 +71,24 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                hashKeyPrefix,
                waitForRemove,
                metricRecorder);
+    }
+
+    public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
+        switch (algorithm) {
+            case NONE:
+                serializingTranscoder = new FastSerializingTranscoder(Compression.NONE);
+                break;
+            case LZ4_NATIVE:
+                serializingTranscoder = new FastSerializingTranscoder(new LZ4NativeCompression());
+                break;
+            case SNAPPY:
+                serializingTranscoder = new FastSerializingTranscoder(new SnappyCompression());
+                break;
+            default:
+                serializingTranscoder = new FastSerializingTranscoder();
+                break;
+        }
+        return self();
     }
 
     public T setWaitForRemove(Duration durationToWaitFor) {
