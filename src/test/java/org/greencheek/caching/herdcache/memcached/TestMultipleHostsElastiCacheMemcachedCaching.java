@@ -9,6 +9,7 @@ import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.server.StringServer;
+import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
@@ -105,10 +106,8 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
 
         ListenableFuture<String> passThrough = cache.apply("Key1", () -> {
             try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+                Thread.sleep(1000);
+            } catch(Exception e) {}
             return "New Value";
         }, executorService);
 
@@ -155,7 +154,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
 
         String[] configurationsMessage = new String[]{
                 "CONFIG cluster 0 147\r\n" + "1\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + "\r\n" + "\nEND\r\n",
-                "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + " localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
+                "CONFIG cluster 0 147\r\n" + "2\r\n" + "localhost|127.0.0.1|" + memcached2.getPort() + "\r\n" + "\nEND\r\n",
 
         };
 
@@ -180,6 +179,7 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
                             .setStaleCacheAdditionalTimeToLive(Duration.ofSeconds(4))
                             .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
                             .setUpdateConfigOnlyOnVersionChange(true)
+                            .setKeyHashType(KeyHashingType.NONE)
                             .buildElastiCacheMemcachedConfig()
             );
 
@@ -191,18 +191,12 @@ public class TestMultipleHostsElastiCacheMemcachedCaching {
 
 
             testStaleCaching(cache);
-            assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>=1);
-
-
-            if(cache instanceof ClearableCache) {
-                ((ClearableCache)cache).clear(true);
-            }
-
             try {
-                Thread.sleep(7000);
+                Thread.sleep(8000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            assertTrue(memcached1.getDaemon().getCache().getCurrentItems() >= 1);
 
             testStaleCaching(cache);
 
