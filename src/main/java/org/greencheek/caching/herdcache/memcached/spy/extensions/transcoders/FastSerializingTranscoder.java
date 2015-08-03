@@ -52,7 +52,7 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized,
                                      int maxContentLengthInBytes, int compressionThresholdInBytes) {
-        this(shareReferences,classesKnownToBeSerialized,maxContentLengthInBytes,compressionThresholdInBytes,new LZ4NativeCompression());
+        this(shareReferences,classesKnownToBeSerialized,maxContentLengthInBytes,compressionThresholdInBytes,new SnappyCompression());
     }
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized,
