@@ -3,7 +3,6 @@
 = HerdCache
 
 :toc:
-:toclevels: 4
 
 
 = Overview
