@@ -1,9 +1,7 @@
-
-
 = HerdCache
+:toc: macro
 
-:toc:
-
+toc::[]
 
 = Overview
 
