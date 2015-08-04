@@ -4,8 +4,6 @@
 
 :toc:
 :toclevels: 4
-:toc-placement!:
-
 toc::[]
 
 
