@@ -1,13 +1,7 @@
-
-
 = HerdCache
-
-:toc:
-:toclevels: 4
-:toc-placement!:
+:toc: macro
 
 toc::[]
-
 
 = Overview
 
