@@ -16,7 +16,7 @@ public class BenchmarkRunner {
     public static void main(String[] args) throws RunnerException {
 
         Options opt = new OptionsBuilder()
-                .include("org.greencheek.caching.herdcache.perf.benchmarks.compression.*")
+                .include("org.greencheek.caching.herdcache.perf.benchmarks.cache.LotsOfSets.*")
                 .warmupIterations(20)
                 .measurementIterations(20)
                 .timeUnit(TimeUnit.MILLISECONDS)

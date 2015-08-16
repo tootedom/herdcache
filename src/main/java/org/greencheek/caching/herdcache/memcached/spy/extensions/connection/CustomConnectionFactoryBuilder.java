@@ -6,6 +6,7 @@ import net.spy.memcached.metrics.MetricCollector;
 import net.spy.memcached.metrics.MetricType;
 import net.spy.memcached.ops.Operation;
 import net.spy.memcached.transcoders.Transcoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,15 +14,25 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Created by dominictootell on 03/05/2014.
+ *
  */
 public class CustomConnectionFactoryBuilder extends ConnectionFactoryBuilder {
+
+    protected LocatorFactory locatorFactory = LocatorFactory.DO_NOTHING;
+
+    /**
+     * Set the locator type.
+     */
+    public ConnectionFactoryBuilder setLocatorFactory(LocatorFactory locatorFactory) {
+        this.locatorFactory = locatorFactory;
+        return this;
+    }
 
     /**
      * Get the ConnectionFactory set up with the provided parameters.
      */
-    public ConnectionFactory build() {
-        return new NoValidationConnectionFactory() {
+    public ConnectionFactory build(boolean doKeyValidation) {
+        return new NoValidationConnectionFactory(doKeyValidation) {
 
             @Override
             public BlockingQueue<Operation> createOperationQueue() {
@@ -43,14 +54,7 @@ public class CustomConnectionFactoryBuilder extends ConnectionFactoryBuilder {
 
             @Override
             public NodeLocator createLocator(List<MemcachedNode> nodes) {
-                switch (locator) {
-                    case ARRAY_MOD:
-                        return new ArrayModNodeLocator(nodes, getHashAlg());
-                    case CONSISTENT:
-                        return new KetamaNodeLocator(nodes, getHashAlg());
-                    default:
-                        throw new IllegalStateException("Unhandled locator type: " + locator);
-                }
+                return locatorFactory.createNodeLocator(nodes,getHashAlg());
             }
 
             @Override

@@ -18,13 +18,13 @@ public class SnappyCompressionPerfTest {
 
     private final static Compression compression = new SnappyCompression();
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] compress() throws IOException {
         return compression.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] compressAndDecompress() throws IOException {
         byte[] compressed = compression.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);

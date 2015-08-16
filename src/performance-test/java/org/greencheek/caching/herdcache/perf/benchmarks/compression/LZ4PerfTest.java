@@ -17,13 +17,13 @@ public class LZ4PerfTest {
 
     private final static Compression compression = new LZ4NativeCompression();
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] compress() throws IOException {
         return compression.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);
     }
 
-    @Benchmark
+//    @Benchmark
     @BenchmarkMode({Mode.Throughput})
     public byte[] compressAndDecompress() throws IOException {
         byte[] compressed = compression.compress(TestCacheValues.LARGE_CACHE_VALUE_BYTES);

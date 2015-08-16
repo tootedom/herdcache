@@ -1,7 +1,7 @@
 package org.greencheek.caching.herdcache.perf.runner;
 
 public class JvmArgs {
-    private final static String[] JFR_JVM_ARGS = new String[]{"-server","-XX:+UnlockCommercialFeatures","-XX:+FlightRecorder","-XX:FlightRecorderOptions=defaultrecording=true,settings=default,disk=true,repository=target/jfr,maxsize=1g,dumponexit=true,dumponexitpath=target/jfr"};
+    private final static String[] JFR_JVM_ARGS = new String[]{"-server","-XX:+UnlockCommercialFeatures","-XX:+FlightRecorder","-XX:StartFlightRecording=settings=profile","-XX:FlightRecorderOptions=defaultrecording=true,settings=profile,disk=true,repository=target/jfr,maxsize=1g,dumponexit=true,dumponexitpath=target/jfr"};
     private final static String[] JVM_ARGS = new String[]{"-server"};
 
     public static String[] getJvmArgs() {

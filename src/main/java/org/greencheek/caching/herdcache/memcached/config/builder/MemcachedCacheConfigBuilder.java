@@ -10,6 +10,7 @@ import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.metrics.NoOpMetricRecorder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.CompressionAlgorithm;
@@ -27,7 +28,6 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private Duration timeToLive =  Duration.ofSeconds(60);
     private int maxCapacity = 1000;
     private String memcachedHosts = "localhost:11211";
-    private ConnectionFactoryBuilder.Locator hashingType  = ConnectionFactoryBuilder.Locator.CONSISTENT;
     private FailureMode failureMode = FailureMode.Redistribute;
     private HashAlgorithm hashAlgorithm = DefaultHashAlgorithm.KETAMA_HASH;
     private Transcoder<Object> serializingTranscoder = new FastSerializingTranscoder();
@@ -51,13 +51,13 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private boolean hashKeyPrefix = true;
     private Duration waitForRemove = Duration.ZERO;
     private MetricRecorder metricRecorder = new NoOpMetricRecorder();
+    private LocatorFactory locatorFactory = LocatorFactory.KETAMA_CEILING_ARRAY;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
        return new MemcachedCacheConfig(
                timeToLive,
                maxCapacity,memcachedHosts,
-               hashingType,
                failureMode,
                hashAlgorithm,serializingTranscoder,
                protocol,readBufferSize,memcachedGetTimeout,
@@ -70,7 +70,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                removeFutureFromInternalCacheBeforeSettingValue,
                hashKeyPrefix,
                waitForRemove,
-               metricRecorder);
+               metricRecorder,
+               locatorFactory);
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -112,7 +113,18 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     }
 
     public T setHashingType(ConnectionFactoryBuilder.Locator hashingType) {
-        this.hashingType = hashingType;
+        switch(hashingType) {
+            case ARRAY_MOD:
+                return setLocatorFactory(LocatorFactory.ARRAY_MOD);
+            case CONSISTENT:
+                return setLocatorFactory(LocatorFactory.KETAMA);
+            default:
+                throw new IllegalStateException("Unhandled locator type: " + hashingType);
+        }
+    }
+
+    public T setLocatorFactory(LocatorFactory locatorFactory) {
+        this.locatorFactory = locatorFactory;
         return self();
     }
 

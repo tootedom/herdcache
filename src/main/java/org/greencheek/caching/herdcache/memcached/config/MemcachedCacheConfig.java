@@ -6,6 +6,7 @@ import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringP
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -18,7 +19,6 @@ public class MemcachedCacheConfig {
     private final Duration timeToLive;
     private final int maxCapacity;
     private final String memcachedHosts;
-    private final ConnectionFactoryBuilder.Locator hashingType;
     private final FailureMode failureMode;
     private final HashAlgorithm hashAlgorithm;
     private final Transcoder<Object> serializingTranscoder;
@@ -43,12 +43,12 @@ public class MemcachedCacheConfig {
     private final boolean hashKeyPrefix;
     private final Duration waitForRemove;
     private final MetricRecorder metricsRecorder;
+    private final LocatorFactory locatorFactory;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
                                 int maxCapacity,
                                 String hosts,
-                                ConnectionFactoryBuilder.Locator hashingType,
                                 FailureMode failureMode,
                                 HashAlgorithm hashAlgorithm,
                                 Transcoder<Object> serializingTranscoder,
@@ -71,11 +71,11 @@ public class MemcachedCacheConfig {
                                 boolean removeFutureFromInternalCacheBeforeSettingValue,
                                 boolean hashKeyPrefix,
                                 Duration waitForRemove,
-                                MetricRecorder metricsRecorder) {
+                                MetricRecorder metricsRecorder,
+                                LocatorFactory locatorFactory) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
-        this.hashingType  = hashingType;
         this.failureMode = failureMode;
         this.hashAlgorithm = hashAlgorithm;
         this.serializingTranscoder = serializingTranscoder;
@@ -100,6 +100,7 @@ public class MemcachedCacheConfig {
         this.hashKeyPrefix = hashKeyPrefix;
         this.waitForRemove = waitForRemove;
         this.metricsRecorder = metricsRecorder;
+        this.locatorFactory = locatorFactory;
     }
 
     public Duration getTimeToLive() {
@@ -112,10 +113,6 @@ public class MemcachedCacheConfig {
 
     public String getMemcachedHosts() {
         return memcachedHosts;
-    }
-
-    public ConnectionFactoryBuilder.Locator getHashingType() {
-        return hashingType;
     }
 
     public FailureMode getFailureMode() {
@@ -224,5 +221,9 @@ public class MemcachedCacheConfig {
 
     public MetricRecorder getMetricsRecorder() {
         return metricsRecorder;
+    }
+
+    public LocatorFactory getLocatorFactory() {
+        return locatorFactory;
     }
 }

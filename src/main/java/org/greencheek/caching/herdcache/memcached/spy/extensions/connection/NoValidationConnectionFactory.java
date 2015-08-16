@@ -9,14 +9,24 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 /**
- * Created by dominictootell on 03/05/2014.
+ *
  */
 public class NoValidationConnectionFactory extends DefaultConnectionFactory {
 
+    private final boolean doKeyValidation;
+    public NoValidationConnectionFactory(boolean doKeyValidation) {
+        this.doKeyValidation = doKeyValidation;
+    }
+
     public MemcachedConnection createConnection(List<InetSocketAddress> addrs)
             throws IOException {
-        return new NoKeyValidationMemcachedConnection(getReadBufSize(), this, addrs,
-                getInitialObservers(), getFailureMode(), getOperationFactory());
+        if(doKeyValidation) {
+            return new NoKeyValidationMemcachedConnection(getReadBufSize(), this, addrs,
+                    getInitialObservers(), getFailureMode(), getOperationFactory());
+        } else {
+            return new StaticLoggerMemcachedConnection(getReadBufSize(),this,addrs,
+                    getInitialObservers(),getFailureMode(),getOperationFactory());
+        }
     }
 
     @Override

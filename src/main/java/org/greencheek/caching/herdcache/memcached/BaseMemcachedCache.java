@@ -1,7 +1,8 @@
 package org.greencheek.caching.herdcache.memcached;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
+//import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.util.concurrent.*;
+import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
 import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
@@ -34,9 +35,10 @@ import java.util.function.Supplier;
 
     public static ConnectionFactory createMemcachedConnectionFactory(MemcachedCacheConfig config) {
         return SpyConnectionFactoryBuilder.createConnectionFactory(
-                config.getHashingType(), config.getFailureMode(),
+                config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
-                config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType());
+                config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType(),
+                config.getLocatorFactory());
     }
 
     public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {
@@ -102,17 +104,25 @@ import java.util.function.Supplier;
 
         int maxCapacity = config.getMaxCapacity();
 
-        this.store = (ConcurrentMap)Caffeine.newBuilder()
-                .maximumSize(maxCapacity)
+        this.store = new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
                 .initialCapacity(maxCapacity)
-                .build()
-                .asMap();
+                .maximumWeightedCapacity(maxCapacity)
+                .build();
+//                (ConcurrentMap)Caffeine.newBuilder()
+//                .maximumSize(maxCapacity)
+//                .initialCapacity(maxCapacity)
+//                .build()
+//                .asMap();
 
-        this.backgroundRevalidationStore = (ConcurrentMap)Caffeine.newBuilder()
-                .maximumSize(maxCapacity)
+        this.backgroundRevalidationStore = new ConcurrentLinkedHashMap.Builder<String, String>()
                 .initialCapacity(maxCapacity)
-                .build()
-                .asMap();
+                .maximumWeightedCapacity(maxCapacity)
+                .build();
+//                (ConcurrentMap)Caffeine.newBuilder()
+//                .maximumSize(maxCapacity)
+//                .initialCapacity(maxCapacity)
+//                .build()
+//                .asMap();
 
         int staleCapacity = config.getStaleMaxCapacity();
         if(staleCapacity<=0) {
@@ -129,12 +139,16 @@ import java.util.function.Supplier;
         }
 
         staleStore = config.isUseStaleCache() ?
-                (ConcurrentMap)Caffeine.newBuilder()
-                        .maximumSize(staleMaxCapacityValue)
+                new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
                         .initialCapacity(staleMaxCapacityValue)
-                        .build()
-                        .asMap() :
-                null;
+                        .maximumWeightedCapacity(staleMaxCapacityValue)
+                        .build() : null;
+//                (ConcurrentMap)Caffeine.newBuilder()
+//                        .maximumSize(staleMaxCapacityValue)
+//                        .initialCapacity(staleMaxCapacityValue)
+//                        .build()
+//                        .asMap() :
+//                null;
 
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
         if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
@@ -463,17 +477,15 @@ import java.util.function.Supplier;
                 boolean validCachedObject = (cachedObjectFoundInCache && isCachedValueValid.test(cachedObject));
                 boolean doRevalidationInBackground = returnInvalidCachedItemWhileRevalidate && cachedObjectFoundInCache && !validCachedObject;
 
-                if(validCachedObject) {
+                if(validCachedObject || doRevalidationInBackground) {
                     logCacheHit(keyString,CACHE_TYPE_ALL);
                     removeFutureFromInternalCache(promise, keyString, cachedObject, store);
-                }
-                else if (doRevalidationInBackground) {
-                    // return the future, but schedule update in background
-                    // without tying to current future to the background update
-                    //
-                    logCacheHit(keyString, CACHE_TYPE_ALL);
-                    performBackgroundRevalidationIfNeeded(keyString, client, computation, timeToLive, executorService, canCacheValueEvalutor);
-                    removeFutureFromInternalCache(promise, keyString, cachedObject, store);
+                    if(doRevalidationInBackground) {
+                        // return the future, but schedule update in background
+                        // without tying to current future to the background update
+                        //
+                        performBackgroundRevalidationIfNeeded(keyString, client, computation, timeToLive, executorService, canCacheValueEvalutor);
+                    }
                 }
                 else {
                     // write with normal semantics

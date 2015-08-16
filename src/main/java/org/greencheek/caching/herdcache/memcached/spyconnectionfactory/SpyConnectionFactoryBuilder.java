@@ -4,6 +4,7 @@ import net.spy.memcached.*;
 import net.spy.memcached.transcoders.Transcoder;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.CustomConnectionFactoryBuilder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -11,25 +12,23 @@ import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.Cust
 public class SpyConnectionFactoryBuilder {
 
     public static ConnectionFactory createConnectionFactory(
-            ConnectionFactoryBuilder.Locator hashingType,
             FailureMode failureMode,
             HashAlgorithm hashAlgorithm,
             Transcoder<Object> serializingTranscoder,
             ConnectionFactoryBuilder.Protocol protocol,
             int readBufferSize,
-            KeyHashingType keyHashType) {
+            KeyHashingType keyHashType,
+            LocatorFactory locatorFactory) {
 
-        ConnectionFactoryBuilder builder =  (keyValidationRequired(keyHashType)==true) ?
-                new ConnectionFactoryBuilder() :  new CustomConnectionFactoryBuilder();
-
+        CustomConnectionFactoryBuilder builder = new CustomConnectionFactoryBuilder();
         builder.setHashAlg(hashAlgorithm);
-        builder.setLocatorType(hashingType);
         builder.setProtocol(protocol);
         builder.setReadBufferSize(readBufferSize);
         builder.setFailureMode(failureMode);
         builder.setTranscoder(serializingTranscoder);
+        builder.setLocatorFactory(locatorFactory);
 
-        return builder.build();
+        return builder.build(keyValidationRequired(keyHashType));
     }
 
     private static boolean keyValidationRequired(KeyHashingType type ) {
