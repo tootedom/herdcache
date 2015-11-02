@@ -14,6 +14,8 @@ public class SimpleVolatileBasedElastiCacheConfigServerUpdater implements Elasti
 
 
     public void connectionUpdated(String connectionString) {
-        listener.accept(connectionString);
+        if(listener!=null) {
+            listener.accept(connectionString);
+        }
     }
 }
