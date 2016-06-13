@@ -23,4 +23,9 @@ public class NoOpMetricRecorder implements MetricRecorder {
     public void setDuration(String metricName, long nanos) {
 
     }
+
+    @Override
+    public void updateHistogram(String metricName,long update) {
+
+    }
 }

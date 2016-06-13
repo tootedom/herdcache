@@ -4,6 +4,7 @@ import de.ruedigermoeller.serialization.FSTConfiguration;
 import de.ruedigermoeller.serialization.FSTObjectInput;
 import de.ruedigermoeller.serialization.FSTObjectOutput;
 import net.spy.memcached.CachedData;
+import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.LZ4NativeCompression;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.SnappyCompression;
@@ -24,44 +25,83 @@ public class FastSerializingTranscoder extends SerializingTranscoder {
     // if you create a new Configuration Object with each serialization !
     final FSTConfiguration conf;
 
-
     public FastSerializingTranscoder() {
-        this(DEFAULT_SHARE_REFERENCES,null);
+        this(new FastSerializingTranscoderConfigBuilder().build());
     }
 
     public FastSerializingTranscoder(Compression compression) {
-        this(DEFAULT_SHARE_REFERENCES,null,compression);
+        this(new FastSerializingTranscoderConfigBuilder().setCompression(compression).build());
     }
 
 
     public FastSerializingTranscoder(int maxContentLengthInBytes, int compressionThresholdInBytes) {
-        this(DEFAULT_SHARE_REFERENCES,null,maxContentLengthInBytes,compressionThresholdInBytes);
+        this(
+                new FastSerializingTranscoderConfigBuilder()
+                    .setMaxContentLengthInBytes(maxContentLengthInBytes)
+                    .setCompressionThresholdInBytes(compressionThresholdInBytes)
+                    .build()
+        );
     }
 
     public FastSerializingTranscoder(Class[] classesKnownToBeSerialized) {
-        this(DEFAULT_SHARE_REFERENCES,classesKnownToBeSerialized);
+        this(new FastSerializingTranscoderConfigBuilder().setClassesKnownToBeSerialized(classesKnownToBeSerialized).build());
     }
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized) {
-        this(shareReferences,classesKnownToBeSerialized,MAX_CONTENT_SIZE_IN_BYTES,DEFAULT_COMPRESSION_THRESHOLD);
+        this(
+                new FastSerializingTranscoderConfigBuilder()
+                .setShareReferences(shareReferences)
+                .setClassesKnownToBeSerialized(classesKnownToBeSerialized)
+                .build()
+        );
     }
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized,Compression compression) {
-        this(shareReferences,classesKnownToBeSerialized,MAX_CONTENT_SIZE_IN_BYTES,DEFAULT_COMPRESSION_THRESHOLD,compression);
+        this(
+                new FastSerializingTranscoderConfigBuilder()
+                .setShareReferences(shareReferences)
+                .setClassesKnownToBeSerialized(classesKnownToBeSerialized)
+                .setCompression(compression)
+                .build()
+        );
+
     }
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized,
                                      int maxContentLengthInBytes, int compressionThresholdInBytes) {
-        this(shareReferences,classesKnownToBeSerialized,maxContentLengthInBytes,compressionThresholdInBytes,new SnappyCompression());
+        this(
+                new FastSerializingTranscoderConfigBuilder()
+                .setShareReferences(shareReferences)
+                .setClassesKnownToBeSerialized(classesKnownToBeSerialized)
+                .setMaxContentLengthInBytes(maxContentLengthInBytes)
+                .setCompressionThresholdInBytes(compressionThresholdInBytes)
+                .build()
+        );
     }
 
     public FastSerializingTranscoder(boolean shareReferences, Class[] classesKnownToBeSerialized,
                                      int maxContentLengthInBytes, int compressionThresholdInBytes,
                                      Compression compression
     ) {
-        super(maxContentLengthInBytes,compressionThresholdInBytes,compression);
+        this(
+                new FastSerializingTranscoderConfigBuilder()
+                .setShareReferences(shareReferences)
+                .setClassesKnownToBeSerialized(classesKnownToBeSerialized)
+                .setMaxContentLengthInBytes(maxContentLengthInBytes)
+                .setCompressionThresholdInBytes(compressionThresholdInBytes)
+                .setCompression(compression)
+                .build()
+        );
+    }
+
+    public FastSerializingTranscoder(FastSerializingTranscoderConfig config) {
+        super(config.getMaxContentLengthInBytes(),
+                config.getCompressionThresholdInBytes(),
+                config.getCompression(),
+                config.getMetricRecorder());
         conf = FSTConfiguration.createDefaultConfiguration();
-        conf.setShareReferences(shareReferences);
+        conf.setShareReferences(config.isShareReferences());
+        Class[] classesKnownToBeSerialized = config.getClassesKnownToBeSerialized();
         if (classesKnownToBeSerialized != null && classesKnownToBeSerialized.length > 0) {
             conf.registerClass(classesKnownToBeSerialized);
         }

@@ -1068,6 +1068,8 @@ public class TestSimpleMemcachedCaching {
 
     @Test
     public void testLargeCacheByteValue() {
+        MetricRegistry registry = new MetricRegistry();
+
         byte[] largeCacheValueAsBytes = largeCacheValue.getBytes();
 
         cache = new SpyMemcachedCache<byte[]>(
@@ -1078,8 +1080,14 @@ public class TestSimpleMemcachedCaching {
                         .setWaitForMemcachedSet(true)
                         .setKeyHashType(KeyHashingType.MD5_LOWER)
                         .setSerializingTranscoder(new SerializingTranscoder(Integer.MAX_VALUE))
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
                         .buildMemcachedConfig()
         );
+
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
 
         ListenableFuture<String> val = cache.apply("Key1", () -> {
             try {
@@ -1105,6 +1113,8 @@ public class TestSimpleMemcachedCaching {
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
+        reporter.report();
+        reporter.stop();
     }
 
 

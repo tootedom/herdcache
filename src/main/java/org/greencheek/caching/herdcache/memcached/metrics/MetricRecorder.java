@@ -8,4 +8,5 @@ public interface MetricRecorder {
     public void cacheMiss(String metricName);
     public void incrementCounter(String metricName);
     public void setDuration(String metricName,long nanos);
+    public void updateHistogram(String metricName,long update);
 }

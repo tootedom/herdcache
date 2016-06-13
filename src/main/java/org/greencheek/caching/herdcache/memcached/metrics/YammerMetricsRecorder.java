@@ -56,4 +56,10 @@ public class YammerMetricsRecorder implements MetricRecorder {
         metricName = getMetricName(metricName);
         registry.timer(metricName+"_timer").update(nanos, TimeUnit.NANOSECONDS);
     }
+
+    @Override
+    public void updateHistogram(String metricName, long update) {
+        metricName = getMetricName(metricName);
+        registry.histogram(metricName).update(update);
+    }
 }

@@ -12,6 +12,8 @@ import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.metrics.NoOpMetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoderConfig;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoderConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.Compression;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.CompressionAlgorithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.LZ4NativeCompression;
@@ -30,7 +32,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private String memcachedHosts = "localhost:11211";
     private FailureMode failureMode = FailureMode.Redistribute;
     private HashAlgorithm hashAlgorithm = DefaultHashAlgorithm.KETAMA_HASH;
-    private Transcoder<Object> serializingTranscoder = new FastSerializingTranscoder();
+    private Transcoder<Object> serializingTranscoder = new FastSerializingTranscoder(new SnappyCompression());
     private ConnectionFactoryBuilder.Protocol protocol = ConnectionFactoryBuilder.Protocol.BINARY;
     private int readBufferSize = DefaultConnectionFactory.DEFAULT_READ_BUFFER_SIZE;
     private Duration memcachedGetTimeout  = Duration.ofMillis(2500);
@@ -52,6 +54,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private Duration waitForRemove = Duration.ZERO;
     private MetricRecorder metricRecorder = new NoOpMetricRecorder();
     private LocatorFactory locatorFactory = LocatorFactory.KETAMA_CEILING_ARRAY;
+    private CompressionAlgorithm compressionAlgorithm = CompressionAlgorithm.SNAPPY;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -77,18 +80,27 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
         switch (algorithm) {
             case NONE:
-                serializingTranscoder = new FastSerializingTranscoder(Compression.NONE);
+                serializingTranscoder = new FastSerializingTranscoder(
+                        new FastSerializingTranscoderConfigBuilder()
+                                .setCompression(Compression.NONE)
+                                .setMetricRecorder(metricRecorder).build());
                 break;
             case LZ4_NATIVE:
-                serializingTranscoder = new FastSerializingTranscoder(new LZ4NativeCompression());
+                serializingTranscoder = new FastSerializingTranscoder(
+                        new FastSerializingTranscoderConfigBuilder()
+                                .setCompression(new LZ4NativeCompression())
+                                .setMetricRecorder(metricRecorder).build());
+
                 break;
             case SNAPPY:
-                serializingTranscoder = new FastSerializingTranscoder(new SnappyCompression());
-                break;
             default:
-                serializingTranscoder = new FastSerializingTranscoder();
+                serializingTranscoder = new FastSerializingTranscoder(
+                        new FastSerializingTranscoderConfigBuilder()
+                                .setCompression(new SnappyCompression())
+                                .setMetricRecorder(metricRecorder).build());
                 break;
         }
+        compressionAlgorithm = algorithm;
         return self();
     }
 
@@ -235,7 +247,6 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setMetricsRecorder(MetricRecorder metricsRecorder) {
         this.metricRecorder = metricsRecorder;
-        return self();
-
+        return setCompressionAlgorithm(compressionAlgorithm);
     }
 }
