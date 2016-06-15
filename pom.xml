@@ -52,7 +52,7 @@
         <maven-site-plugin.version>3.3</maven-site-plugin.version>
         <logback.version>1.1.1</logback.version>
 
-        <guava.version>18.0</guava.version>
+        <guava.version>19.0</guava.version>
         <concurrentlinkedhashmap.version>1.4.2</concurrentlinkedhashmap.version>
 
         <hystrix.version>1.4.5</hystrix.version>

@@ -55,6 +55,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private MetricRecorder metricRecorder = new NoOpMetricRecorder();
     private LocatorFactory locatorFactory = LocatorFactory.KETAMA_CEILING_ARRAY;
     private CompressionAlgorithm compressionAlgorithm = CompressionAlgorithm.SNAPPY;
+    private boolean herdProtectionEnabled = true;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -74,7 +75,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                hashKeyPrefix,
                waitForRemove,
                metricRecorder,
-               locatorFactory);
+               locatorFactory,
+               herdProtectionEnabled);
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -248,5 +250,15 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     public T setMetricsRecorder(MetricRecorder metricsRecorder) {
         this.metricRecorder = metricsRecorder;
         return setCompressionAlgorithm(compressionAlgorithm);
+    }
+
+    public T enabledHerdProtection() {
+        this.herdProtectionEnabled = true;
+        return self();
+    }
+
+    public T disableHerdProtection() {
+        this.herdProtectionEnabled = false;
+        return self();
     }
 }

@@ -3,6 +3,7 @@ package org.greencheek.caching.herdcache.memcached;
 //import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+//import io.netty.util.concurrent.Promise;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
 import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
@@ -17,6 +18,9 @@ import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 import org.greencheek.caching.herdcache.memcached.callbacks.FailureCallback;
 import org.greencheek.caching.herdcache.memcached.callbacks.SuccessCallback;
+import org.greencheek.caching.herdcache.memcached.util.futures.SettableFuture;
+import org.greencheek.caching.herdcache.memcached.util.futures.DoNothingSettableFuture;
+import org.greencheek.caching.herdcache.memcached.util.futures.GuavaSettableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +77,10 @@ import java.util.function.Supplier;
     private static final Logger logger  = LoggerFactory.getLogger(BaseMemcachedCache.class);
     private static final Logger cacheHitMissLogger   = LoggerFactory.getLogger("MemcachedCacheHitsLogger");
 
+    private final SettableFuture<V> DUMMY_FUTURE_NOT_TO_RETURN = new DoNothingSettableFuture<>();
+
+    private final ConcurrentMap<String,ListenableFuture<V>> DO_NOTHING_MAP = new NoOpConcurrentMap<>();
+
     private final MemcachedCacheConfig config;
     private final KeyHashing keyHashingFunction;
     private final String keyprefix;
@@ -81,7 +89,7 @@ import java.util.function.Supplier;
     private final int staleMaxCapacityValue;
     private final Duration staleCacheAdditionalTimeToLiveValue;
     private final ConcurrentMap<String,ListenableFuture<V>> staleStore;
-    private final ConcurrentMap<String,String> backgroundRevalidationStore;
+    private final ConcurrentMap<String,ListenableFuture<V>> backgroundRevalidationStore;
 
 
 
@@ -104,25 +112,9 @@ import java.util.function.Supplier;
 
         int maxCapacity = config.getMaxCapacity();
 
-        this.store = new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
-                .initialCapacity(maxCapacity)
-                .maximumWeightedCapacity(maxCapacity)
-                .build();
-//                (ConcurrentMap)Caffeine.newBuilder()
-//                .maximumSize(maxCapacity)
-//                .initialCapacity(maxCapacity)
-//                .build()
-//                .asMap();
+        this.store = createInternalCache(config.isHerdProtectionEnabled(),maxCapacity,maxCapacity);
 
-        this.backgroundRevalidationStore = new ConcurrentLinkedHashMap.Builder<String, String>()
-                .initialCapacity(maxCapacity)
-                .maximumWeightedCapacity(maxCapacity)
-                .build();
-//                (ConcurrentMap)Caffeine.newBuilder()
-//                .maximumSize(maxCapacity)
-//                .initialCapacity(maxCapacity)
-//                .build()
-//                .asMap();
+        this.backgroundRevalidationStore = createInternalCache(true,maxCapacity,maxCapacity);
 
         int staleCapacity = config.getStaleMaxCapacity();
         if(staleCapacity<=0) {
@@ -138,17 +130,8 @@ import java.util.function.Supplier;
             staleCacheAdditionalTimeToLiveValue = staleDuration;
         }
 
-        staleStore = config.isUseStaleCache() ?
-                new ConcurrentLinkedHashMap.Builder<String, ListenableFuture<V>>()
-                        .initialCapacity(staleMaxCapacityValue)
-                        .maximumWeightedCapacity(staleMaxCapacityValue)
-                        .build() : null;
-//                (ConcurrentMap)Caffeine.newBuilder()
-//                        .maximumSize(staleMaxCapacityValue)
-//                        .initialCapacity(staleMaxCapacityValue)
-//                        .build()
-//                        .asMap() :
-//                null;
+        staleStore = config.isUseStaleCache() ? createInternalCache(config.isUseStaleCache(),staleMaxCapacityValue,staleMaxCapacityValue) : null;
+
 
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
         if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
@@ -162,6 +145,25 @@ import java.util.function.Supplier;
         failureHandler = (String key, Throwable t) -> { store.remove(key); };
 
         metricRecorder = config.getMetricsRecorder();
+    }
+
+    private ConcurrentMap createInternalCache(boolean createCache,
+                                            int initialCapacity,
+                                            int maxCapacity) {
+        if(createCache) {
+            return new ConcurrentLinkedHashMap.Builder()
+                    .initialCapacity(initialCapacity)
+                    .maximumWeightedCapacity(maxCapacity)
+                    .build();
+//                (ConcurrentMap)Caffeine.newBuilder()
+//                .maximumSize(maxCapacity)
+//                .initialCapacity(maxCapacity)
+//                .build()
+//                .asMap();
+        } else {
+            return new NoOpConcurrentMap();
+        }
+
     }
 
     private boolean isEnabled() {
@@ -271,7 +273,7 @@ import java.util.function.Supplier;
     private ListenableFuture<V> scheduleValueComputation(final String key,
                                                          final Supplier<V> computation,
                                                          final ListeningExecutorService executorService) {
-        SettableFuture<V> toBeComputedFuture =  SettableFuture.create();
+        SettableFuture<V> toBeComputedFuture =  new GuavaSettableFuture<>();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {
             logCacheMiss(key,CACHE_TYPE_CACHE_DISABLED);
@@ -314,7 +316,7 @@ import java.util.function.Supplier;
                                     key)
                     );
         } catch(Throwable failedToSubmit) {
-            final SettableFuture<V> promise = SettableFuture.create();
+            final SettableFuture<V> promise = new GuavaSettableFuture<>();
             metricRecorder.incrementCounter(CACHE_TYPE_DISTRIBUTED_CACHE_REJECTION);
             String message = "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
             logger.warn(message, failedToSubmit);
@@ -462,7 +464,7 @@ import java.util.function.Supplier;
             return scheduleValueComputation(keyString,computation,executorService);
         }
         else {
-            final SettableFuture<V> promise = SettableFuture.create();
+            final SettableFuture<V> promise = new GuavaSettableFuture<>();
             // create and store a new future for the to be generated value
             // first checking against local a cache to see if the computation is already
             // occurring
@@ -493,9 +495,9 @@ import java.util.function.Supplier;
                     logCacheMiss(keyString, CACHE_TYPE_ALL);
                     Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
                             keyString, timeToLive, executorService,
-                            canCacheValueEvalutor,
-                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
-                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
+                            canCacheValueEvalutor, promise,store);
+//                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
+//                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
 
                     if(exceptionDuringWrite!=null) {
                         removeFutureFromInternalCacheWithException(promise, keyString, exceptionDuringWrite, store);
@@ -510,6 +512,50 @@ import java.util.function.Supplier;
         }
     }
 
+    @Override
+    public ListenableFuture<V> set(String keyString, V value) {
+        return set(keyString,value,MoreExecutors.newDirectExecutorService());
+    }
+
+    @Override
+    public ListenableFuture<V> set(String keyString, V value, ListeningExecutorService executorService) {
+        return set(keyString, () -> value,config.getTimeToLive(),Cache.CAN_ALWAYS_CACHE_VALUE, executorService);
+    }
+
+    @Override
+    public ListenableFuture<V> set(String key, Supplier<V> computation,Duration timeToLive,
+                                   Predicate<V> canCacheValueEvalutor,
+                                   ListeningExecutorService executorService) {
+        String keyString = getHashedKey(key);
+
+
+        ReferencedClient client = clientFactory.getClient();
+        if(!client.isAvailable()) {
+            warnCacheDisabled();
+            return scheduleValueComputation(keyString,computation,executorService);
+        }
+        else {
+            // write with normal semantics
+            final SettableFuture<V> promise = new GuavaSettableFuture<>();
+
+            logger.debug("set requested for {}", keyString);
+            logCacheMiss(keyString, CACHE_TYPE_ALL);
+            Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
+                    keyString, timeToLive, executorService,
+                    canCacheValueEvalutor, promise, DO_NOTHING_MAP);
+
+
+            if (exceptionDuringWrite != null) {
+                promise.setException(exceptionDuringWrite);
+            }
+            return promise;
+        }
+
+    }
+
+
+
+
     private void performBackgroundRevalidationIfNeeded(final String keyString,
                                                        final ReferencedClient client,
                                                        final Supplier<V> computation,
@@ -517,7 +563,7 @@ import java.util.function.Supplier;
                                                        final ListeningExecutorService executorService,
                                                        final Predicate<V> canCacheValueEvalutor) {
 
-        String previousEntry = backgroundRevalidationStore.putIfAbsent(keyString,keyString);
+        ListenableFuture<V> previousEntry = backgroundRevalidationStore.putIfAbsent(keyString,DUMMY_FUTURE_NOT_TO_RETURN);
 
         if(previousEntry!=null) {
             return;
@@ -525,8 +571,10 @@ import java.util.function.Supplier;
             Throwable ableSubmitForExecution = cacheWriteFunction(client, computation,
                                                                 keyString, timeToLive, executorService,
                                                                 canCacheValueEvalutor,
-                                                                (V result) -> backgroundRevalidationStore.remove(keyString),
-                                                                (Throwable error) -> backgroundRevalidationStore.remove(keyString));
+                    DUMMY_FUTURE_NOT_TO_RETURN,backgroundRevalidationStore);
+//
+//                                                                (V result) -> backgroundRevalidationStore.remove(keyString),
+//                                                                (Throwable error) -> backgroundRevalidationStore.remove(keyString));
 
             if(ableSubmitForExecution!=null) {
                 backgroundRevalidationStore.remove(keyString);
@@ -537,11 +585,21 @@ import java.util.function.Supplier;
     private void removeFutureFromInternalCache(SettableFuture<V> promise,String keyString, V cachedObject,
                                                ConcurrentMap<String,ListenableFuture<V>> internalCache) {
         if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-            internalCache.remove(keyString);
-            promise.set(cachedObject);
+            if(internalCache!=null) {
+                internalCache.remove(keyString);
+            }
+
+            if(promise!=null) {
+                promise.set(cachedObject);
+            }
         } else {
-            promise.set(cachedObject);
-            internalCache.remove(keyString);
+            if(promise!=null) {
+                promise.set(cachedObject);
+            }
+
+            if(internalCache!=null){
+                internalCache.remove(keyString);
+            }
         }
     }
 
@@ -595,7 +653,7 @@ import java.util.function.Supplier;
                                                                         ListenableFuture<V> backendFuture) {
 
         // protection against thundering herd on stale memcached
-        SettableFuture<V> promise = SettableFuture.create();
+        SettableFuture<V> promise = new GuavaSettableFuture<>();
 
         ListenableFuture<V> existingFuture = staleStore.putIfAbsent(key, promise);
 
@@ -633,8 +691,10 @@ import java.util.function.Supplier;
                                                  final String key,
                                                  final Duration itemExpiry,
                                                  final Predicate<V> canCacheValue,
-                                                 final SuccessCallback<V> successFutureCallBack,
-                                                 final FailureCallback failureFutureCallBack) {
+                                                 final SettableFuture<V> future,
+                                                 final ConcurrentMap<String,ListenableFuture<V>> cachedFutures) {
+//                                                 final SuccessCallback<V> successFutureCallBack,
+//                                                 final FailureCallback failureFutureCallBack) {
         return () -> {
             final long startNanos =  System.nanoTime();
             boolean ok = false;
@@ -665,12 +725,14 @@ import java.util.function.Supplier;
                     }
 
                     metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
-                    successFutureCallBack.onSuccess(results);
+                    removeFutureFromInternalCache(future,key,results,cachedFutures);
+//                    successFutureCallBack.onSuccess(results);
 
                 } else {
                     metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
                     metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
-                    failureFutureCallBack.onFailure(throwable);
+                    removeFutureFromInternalCacheWithException(future,key,throwable,cachedFutures);
+//                    failureFutureCallBack.onFailure(throwable);
                 }
                 return results;
             }
@@ -692,13 +754,16 @@ import java.util.function.Supplier;
                                                    final Duration itemExpiry,
                                                    final ListeningExecutorService executorService,
                                                    final Predicate<V> canCacheValue,
-                                                   final SuccessCallback<V> successFutureCallBack,
-                                                   final FailureCallback failureFutureCallBack
+                                                   final SettableFuture<V> future,
+                                                   final ConcurrentMap<String,ListenableFuture<V>> cachedFutureStore
+//                                                   final SuccessCallback<V> successFutureCallBack,
+//                                                   final FailureCallback failureFutureCallBack
 
     ) {
         try {
             executorService.submit(
-                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,successFutureCallBack,failureFutureCallBack));
+//                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,successFutureCallBack,failureFutureCallBack));
+                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,future,cachedFutureStore));
 
         } catch(Throwable failedToSubmit) {
             metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER);
