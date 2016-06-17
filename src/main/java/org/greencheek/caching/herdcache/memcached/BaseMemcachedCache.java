@@ -273,7 +273,7 @@ import java.util.function.Supplier;
     private ListenableFuture<V> scheduleValueComputation(final String key,
                                                          final Supplier<V> computation,
                                                          final ListeningExecutorService executorService) {
-        SettableFuture<V> toBeComputedFuture =  new GuavaSettableFuture<>();
+        com.google.common.util.concurrent.SettableFuture<V> toBeComputedFuture =  com.google.common.util.concurrent.SettableFuture.create();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {
             logCacheMiss(key,CACHE_TYPE_CACHE_DISABLED);
@@ -585,21 +585,11 @@ import java.util.function.Supplier;
     private void removeFutureFromInternalCache(SettableFuture<V> promise,String keyString, V cachedObject,
                                                ConcurrentMap<String,ListenableFuture<V>> internalCache) {
         if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-            if(internalCache!=null) {
-                internalCache.remove(keyString);
-            }
-
-            if(promise!=null) {
-                promise.set(cachedObject);
-            }
+            internalCache.remove(keyString);
+            promise.set(cachedObject);
         } else {
-            if(promise!=null) {
-                promise.set(cachedObject);
-            }
-
-            if(internalCache!=null){
-                internalCache.remove(keyString);
-            }
+            promise.set(cachedObject);
+            internalCache.remove(keyString);
         }
     }
 
