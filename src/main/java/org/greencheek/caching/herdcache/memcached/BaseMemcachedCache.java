@@ -6,6 +6,7 @@ import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 //import io.netty.util.concurrent.Promise;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
+import org.greencheek.caching.herdcache.callables.GetFromDistributedCache;
 import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
 import org.greencheek.caching.herdcache.exceptions.UnableToSubmitSupplierForExecutionException;
 import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationCompleteNotifier;
@@ -15,9 +16,14 @@ import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.factory.*;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
+import org.greencheek.caching.herdcache.memcached.operations.BasicCacheRead;
+import org.greencheek.caching.herdcache.memcached.operations.BasicCacheWrite;
+import org.greencheek.caching.herdcache.memcached.operations.CacheRead;
+import org.greencheek.caching.herdcache.memcached.operations.CacheWrite;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 import org.greencheek.caching.herdcache.memcached.callbacks.FailureCallback;
 import org.greencheek.caching.herdcache.memcached.callbacks.SuccessCallback;
+import org.greencheek.caching.herdcache.memcached.util.CacheMetricStrings;
 import org.greencheek.caching.herdcache.memcached.util.futures.SettableFuture;
 import org.greencheek.caching.herdcache.memcached.util.futures.DoNothingSettableFuture;
 import org.greencheek.caching.herdcache.memcached.util.futures.GuavaSettableFuture;
@@ -56,26 +62,11 @@ import java.util.function.Supplier;
         }
     }
 
-    public static final String CACHE_TYPE_VALUE_CALCULATION = "value_calculation_cache";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER = "value_calculation_time";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER = "value_calculation_success_latency";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER = "value_calculation_failure_latency";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER = "value_calculation_success";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER = "value_calculation_failure";
-    public static final String CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER= "value_calculation_rejected_execution";
-    public static final String CACHE_TYPE_STALE_VALUE_CALCULATION = "stale_value_calculation_cache";
-    public static final String CACHE_TYPE_CACHE_DISABLED = "disabled_cache";
-    public static final String CACHE_TYPE_CACHE_DISABLED_REJECTION = "disabled_cache";
-
-    public static final String CACHE_TYPE_STALE_CACHE = "stale_distributed_cache";
-    public static final String CACHE_TYPE_DISTRIBUTED_CACHE = "distributed_cache";
-    public static final String CACHE_TYPE_DISTRIBUTED_CACHE_WRITES_COUNTER="distributed_cache_writes";
-    public static final String CACHE_TYPE_DISTRIBUTED_CACHE_REJECTION = "distributed_cache_rejection";
-    public static final String CACHE_TYPE_ALL = "cache";
 
 
+    private final CacheWrite cacheWriter = new BasicCacheWrite();
+    private final CacheRead<V> cacheReader = new BasicCacheRead();
     private static final Logger logger  = LoggerFactory.getLogger(BaseMemcachedCache.class);
-    private static final Logger cacheHitMissLogger   = LoggerFactory.getLogger("MemcachedCacheHitsLogger");
 
     private final SettableFuture<V> DUMMY_FUTURE_NOT_TO_RETURN = new DoNothingSettableFuture<>();
 
@@ -170,21 +161,10 @@ import java.util.function.Supplier;
         return clientFactory.isEnabled();
     }
 
-    private void logCacheHit(String key, String cacheType) {
-        metricRecorder.cacheHit(cacheType);
-        cacheHitMissLogger.debug("{ \"cachehit\" : \"{}\", \"cachetype\" : \"{}\"}",key,cacheType);
-    }
-
-    private void logCacheMiss(String key, String cacheType) {
-        metricRecorder.cacheMiss(cacheType);
-        cacheHitMissLogger.debug("{ \"cachemiss\" : \"{}\", \"cachetype\" : \"{}\"}",key,cacheType);
-    }
 
     private void warnCacheDisabled() {
         logger.warn("Cache is disabled");
     }
-
-
 
     private KeyHashing getKeyHashingFunction(KeyHashingType type) {
        switch (type) {
@@ -235,31 +215,6 @@ import java.util.function.Supplier;
 
     }
 
-    private void writeToDistributedCache(ReferencedClient client,
-                                         String key, Object valueToCache,
-                                         int entryTTLInSeconds, boolean waitForMemcachedSet) {
-        try {
-            Future futureSet = client.set(key, entryTTLInSeconds, valueToCache);
-            if(waitForMemcachedSet) {
-                try {
-                    futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
-                } catch (Throwable e) {
-                    logger.warn("Exception waiting for memcached set to occur for key {}",key, e);
-                }
-            }
-        } catch (Throwable e) {
-             logger.warn("Exception performing memcached set for key {}",key, e);
-        }
-    }
-
-    private void writeToDistributedCache(ReferencedClient client,
-                                         String key, V value,
-                                         Duration timeToLive, boolean waitForMemcachedSet) {
-        metricRecorder.incrementCounter(CACHE_TYPE_DISTRIBUTED_CACHE_WRITES_COUNTER);
-        writeToDistributedCache(client, key, value, (int)getDuration(timeToLive),waitForMemcachedSet);
-
-    }
-
     /**
      * Used when the cache is disabled (all hosts are down for maintenance, etc).
      * The {@link java.util.function.Supplier} is submitted to the executor, and
@@ -276,7 +231,7 @@ import java.util.function.Supplier;
         com.google.common.util.concurrent.SettableFuture<V> toBeComputedFuture =  com.google.common.util.concurrent.SettableFuture.create();
         ListenableFuture<V> previousFuture = store.putIfAbsent(key, toBeComputedFuture);
         if(previousFuture==null) {
-            logCacheMiss(key,CACHE_TYPE_CACHE_DISABLED);
+            Cache.logCacheMiss(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED);
             try {
                 executorService.submit(
                         () -> {
@@ -294,7 +249,7 @@ import java.util.function.Supplier;
                             return results;
                         });
             } catch(Throwable failedToSubmit) {
-                metricRecorder.incrementCounter(CACHE_TYPE_CACHE_DISABLED_REJECTION);
+                metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED_REJECTION);
                 logger.warn("Unable able to submit computation (Supplier) to executor in order to obtain the value for key {}", key, failedToSubmit);
                 toBeComputedFuture.setException(failedToSubmit);
             }
@@ -302,7 +257,7 @@ import java.util.function.Supplier;
 
             return toBeComputedFuture;
         } else {
-            logCacheHit(key,CACHE_TYPE_VALUE_CALCULATION);
+            Cache.logCacheHit(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
             return previousFuture;
         }
     }
@@ -312,12 +267,16 @@ import java.util.function.Supplier;
                                                         final ListeningExecutorService ec) {
         try {
             return ec.submit(
-                            createGetFromDistributedCacheCallable(() -> getFromDistributedCache(client, key, memcachedGetTimeoutInMillis, CACHE_TYPE_DISTRIBUTED_CACHE),
-                                    key)
+                            new GetFromDistributedCache<V>(key,
+                                    metricRecorder,
+                                    memcachedGetTimeoutInMillis,
+                                    client,
+                                    CacheMetricStrings.CACHE_TYPE_DISTRIBUTED_CACHE,
+                                    cacheReader)
                     );
         } catch(Throwable failedToSubmit) {
             final SettableFuture<V> promise = new GuavaSettableFuture<>();
-            metricRecorder.incrementCounter(CACHE_TYPE_DISTRIBUTED_CACHE_REJECTION);
+            metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_DISTRIBUTED_CACHE_REJECTION);
             String message = "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
             logger.warn(message, failedToSubmit);
             promise.setException(new UnableToScheduleCacheGetExecutionException(message,failedToSubmit));
@@ -339,21 +298,21 @@ import java.util.function.Supplier;
             warnCacheDisabled();
             ListenableFuture<V> previousFuture = store.get(keyString);
             if(previousFuture==null) {
-                logCacheMiss(keyString, CACHE_TYPE_CACHE_DISABLED);
+                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED);
                 return Futures.immediateCheckedFuture(null);
             } else {
-                logCacheHit(keyString, CACHE_TYPE_VALUE_CALCULATION);
+                Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                 return previousFuture;
             }
         } else {
             ListenableFuture<V> future = store.get(keyString);
             if(future==null) {
-                logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
+                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                 ListenableFuture<V> futureForCacheLookup = getFromDistributedCache(client,keyString,executorService);
                 return futureForCacheLookup;
             }
             else {
-                logCacheHit(keyString, CACHE_TYPE_VALUE_CALCULATION);
+                Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
                     return getFutureForStaleDistributedCacheLookup(client, createStaleCacheKey(keyString), future);
                 } else {
@@ -375,9 +334,9 @@ import java.util.function.Supplier;
             }
 
             if(ok && result!=null) {
-                logCacheHit(keyString, CACHE_TYPE_ALL);
+                Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
             } else {
-                logCacheMiss(keyString,CACHE_TYPE_ALL);
+                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
             }
             return result;
         };
@@ -470,17 +429,21 @@ import java.util.function.Supplier;
             // occurring
             ListenableFuture<V> existingFuture  = store.putIfAbsent(keyString, promise);
             if(existingFuture==null) {
-                logCacheMiss(keyString, CACHE_TYPE_VALUE_CALCULATION);
+                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                 // check memcached.
 
-                V cachedObject = getFromDistributedCache(client,keyString,memcachedGetTimeoutInMillis,CACHE_TYPE_DISTRIBUTED_CACHE);
+                V cachedObject = cacheReader.getFromDistributedCache(client,
+                        keyString,
+                        memcachedGetTimeoutInMillis,
+                        CacheMetricStrings.CACHE_TYPE_DISTRIBUTED_CACHE,
+                        metricRecorder);
 
                 boolean cachedObjectFoundInCache = cachedObject!=null;
                 boolean validCachedObject = (cachedObjectFoundInCache && isCachedValueValid.test(cachedObject));
                 boolean doRevalidationInBackground = returnInvalidCachedItemWhileRevalidate && cachedObjectFoundInCache && !validCachedObject;
 
                 if(validCachedObject || doRevalidationInBackground) {
-                    logCacheHit(keyString,CACHE_TYPE_ALL);
+                    Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
                     removeFutureFromInternalCache(promise, keyString, cachedObject, store);
                     if(doRevalidationInBackground) {
                         // return the future, but schedule update in background
@@ -492,7 +455,7 @@ import java.util.function.Supplier;
                 else {
                     // write with normal semantics
                     logger.debug("set requested for {}", keyString);
-                    logCacheMiss(keyString, CACHE_TYPE_ALL);
+                    Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
                     Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
                             keyString, timeToLive, executorService,
                             canCacheValueEvalutor, promise,store);
@@ -539,7 +502,7 @@ import java.util.function.Supplier;
             final SettableFuture<V> promise = new GuavaSettableFuture<>();
 
             logger.debug("set requested for {}", keyString);
-            logCacheMiss(keyString, CACHE_TYPE_ALL);
+            Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
             Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
                     keyString, timeToLive, executorService,
                     canCacheValueEvalutor, promise, DO_NOTHING_MAP);
@@ -617,7 +580,7 @@ import java.util.function.Supplier;
      */
     private  ListenableFuture<V> returnStaleOrCachedItem(ReferencedClient client, String keyRequested,ListenableFuture<V> cachedFuture,
                                                          ListeningExecutorService executor) {
-        logCacheHit(keyRequested, CACHE_TYPE_VALUE_CALCULATION);
+        Cache.logCacheHit(metricRecorder, keyRequested, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
         if(config.isUseStaleCache()) {
             String staleCacheKey = createStaleCacheKey(keyRequested);
             return getFutureForStaleDistributedCacheLookup(client, staleCacheKey, cachedFuture);
@@ -648,9 +611,13 @@ import java.util.function.Supplier;
         ListenableFuture<V> existingFuture = staleStore.putIfAbsent(key, promise);
 
         if (existingFuture == null) {
-            logCacheMiss(key, BaseMemcachedCache.CACHE_TYPE_STALE_VALUE_CALCULATION);
+            Cache.logCacheMiss(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_STALE_VALUE_CALCULATION);
 
-            V item = getFromDistributedCache(client, key, this.staleCacheMemachedGetTimeoutInMillis, CACHE_TYPE_STALE_CACHE);
+            V item = cacheReader.getFromDistributedCache(client,
+                    key,
+                    this.staleCacheMemachedGetTimeoutInMillis,
+                    CacheMetricStrings.CACHE_TYPE_STALE_CACHE,
+                    metricRecorder);
 
             if(item==null) {
                 removeFutureFromInternalCache(promise, key, null, staleStore);
@@ -661,7 +628,7 @@ import java.util.function.Supplier;
             }
 
         } else {
-            logCacheHit(key, BaseMemcachedCache.CACHE_TYPE_STALE_VALUE_CALCULATION);
+            Cache.logCacheHit(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_STALE_VALUE_CALCULATION);
             try {
                 V item = promise.get();
                 if(item==null) {
@@ -697,16 +664,22 @@ import java.util.function.Supplier;
                 throwable = err;
             } finally {
                 long time = System.nanoTime()-startNanos;
-                metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
+                metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
 
                 if(ok) {
-                    metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,time);
+                    metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,time);
 
                     if (results != null) {
                         if (canCacheValue.test(results)) {
                             writeToDistributedStaleCache(client, key, itemExpiry, results);
                             // write the cache entry
-                            writeToDistributedCache(client, key, results, itemExpiry, config.isWaitForMemcachedSet());
+                            cacheWriter.writeToDistributedCache(client,
+                                    key,
+                                    results,
+                                    (int) getDuration(itemExpiry),
+                                    config.isWaitForMemcachedSet(),
+                                    waitForSetDurationInMillis,
+                                    metricRecorder);
                         } else {
                             logger.debug("Cache Value cannot be cached, as determine by predicate. Therefore, not storing in memcached");
                         }
@@ -714,13 +687,13 @@ import java.util.function.Supplier;
                         logger.debug("Cache Value computation was null, not storing in memcached");
                     }
 
-                    metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+                    metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
                     removeFutureFromInternalCache(future,key,results,cachedFutures);
 //                    successFutureCallBack.onSuccess(results);
 
                 } else {
-                    metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
-                    metricRecorder.setDuration(CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
+                    metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
+                    metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
                     removeFutureFromInternalCacheWithException(future,key,throwable,cachedFutures);
 //                    failureFutureCallBack.onFailure(throwable);
                 }
@@ -756,7 +729,7 @@ import java.util.function.Supplier;
                     createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,future,cachedFutureStore));
 
         } catch(Throwable failedToSubmit) {
-            metricRecorder.incrementCounter(CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER);
+            metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER);
             String message = "Unable able to submit computation (Supplier) to executor in order to obtain the value for key: " + key;
             logger.warn(message,failedToSubmit);
             return new UnableToSubmitSupplierForExecutionException(message,failedToSubmit);
@@ -771,40 +744,17 @@ import java.util.function.Supplier;
             String staleCacheKey =  createStaleCacheKey(key);
             Duration staleCacheExpiry = ttl.plus(staleCacheAdditionalTimeToLiveValue);
             // overwrite the stale cache entry
-            writeToDistributedCache(client, staleCacheKey, valueToWriteToCache, staleCacheExpiry, false);
+            cacheWriter.writeToDistributedCache(client,
+                    staleCacheKey,
+                    valueToWriteToCache,
+                    (int)getDuration(staleCacheExpiry),
+                    false,
+                    waitForSetDurationInMillis,
+                    metricRecorder);
+
         }
     }
 
-    /**
-     * Returns an Object from the distributed cache.  The object will be
-     * an instance of Serializable.  If no item existed in the cached
-     * null WILL be returned
-     *
-     * @param key The key to find in the distributed cache
-     * @param timeoutInMillis The amount of time to wait for the get on the distributed cache
-     * @param cacheType The cache type.  This is output to the log when a hit or miss is logged
-     * @return
-     */
-    private V getFromDistributedCache(ReferencedClient client,String key, long timeoutInMillis,
-                                      String cacheType) {
-        V serialisedObj = null;
-        long nanos = System.nanoTime();
-        try {
-            serialisedObj = (V) client.get(key,timeoutInMillis, TimeUnit.MILLISECONDS);
-            if(serialisedObj==null){
-                logCacheMiss(key,cacheType);
-            } else {
-                logCacheHit(key,cacheType);
-            }
-        } catch(Throwable e) {
-            logger.warn("Exception thrown when communicating with memcached for get({}): {}", key, e.getMessage());
-        } finally {
-            metricRecorder.incrementCounter(cacheType);
-            metricRecorder.setDuration(cacheType,System.nanoTime()-nanos);
-        }
-
-        return serialisedObj;
-    }
 
     private String createStaleCacheKey(String key) {
         return config.getStaleCachePrefix() + key;
