@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.memcached.util.futures;
+package org.greencheek.caching.herdcache.util.futures;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.ExecutionException;
@@ -7,47 +7,49 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * DO NOT USE outside of hercache
+ *
  */
-public class DoNothingSettableFuture<V> implements SettableFuture<V> {
+public class GuavaSettableFuture<V> implements SettableFuture<V> {
+
+    private final com.google.common.util.concurrent.SettableFuture<V> wrappedFuture = com.google.common.util.concurrent.SettableFuture.create();
 
     @Override
     public boolean set(@Nullable V value) {
-        return true;
+        return wrappedFuture.set(value);
     }
 
     @Override
     public boolean setException(Throwable throwable) {
-        return true;
+        return wrappedFuture.setException(throwable);
     }
 
     @Override
     public void addListener(Runnable listener, Executor executor) {
-
+        wrappedFuture.addListener(listener,executor);
     }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
-        return true;
+        return wrappedFuture.cancel(mayInterruptIfRunning);
     }
 
     @Override
     public boolean isCancelled() {
-        return true;
+        return wrappedFuture.isCancelled();
     }
 
     @Override
     public boolean isDone() {
-        return true;
+        return wrappedFuture.isDone();
     }
 
     @Override
     public V get() throws InterruptedException, ExecutionException {
-        return null;
+        return wrappedFuture.get();
     }
 
     @Override
     public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-        return null;
+        return wrappedFuture.get(timeout,unit);
     }
 }

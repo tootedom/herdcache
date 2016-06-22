@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.memcached.util.futures;
+package org.greencheek.caching.herdcache.util.futures;
 
 
 import com.google.common.util.concurrent.ListenableFuture;

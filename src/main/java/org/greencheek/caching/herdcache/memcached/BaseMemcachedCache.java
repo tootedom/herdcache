@@ -3,7 +3,6 @@ package org.greencheek.caching.herdcache.memcached;
 //import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
-//import io.netty.util.concurrent.Promise;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
 import org.greencheek.caching.herdcache.callables.GetFromDistributedCache;
@@ -14,19 +13,18 @@ import org.greencheek.caching.herdcache.lru.CacheValueComputationFailureHandler;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.factory.*;
-import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
-import org.greencheek.caching.herdcache.memcached.operations.BasicCacheRead;
-import org.greencheek.caching.herdcache.memcached.operations.BasicCacheWrite;
-import org.greencheek.caching.herdcache.memcached.operations.CacheRead;
-import org.greencheek.caching.herdcache.memcached.operations.CacheWrite;
+import org.greencheek.caching.herdcache.memcached.operations.*;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
-import org.greencheek.caching.herdcache.memcached.callbacks.FailureCallback;
-import org.greencheek.caching.herdcache.memcached.callbacks.SuccessCallback;
 import org.greencheek.caching.herdcache.memcached.util.CacheMetricStrings;
-import org.greencheek.caching.herdcache.memcached.util.futures.SettableFuture;
-import org.greencheek.caching.herdcache.memcached.util.futures.DoNothingSettableFuture;
-import org.greencheek.caching.herdcache.memcached.util.futures.GuavaSettableFuture;
+import org.greencheek.caching.herdcache.util.CacheKeyCreatorFactory;
+import org.greencheek.caching.herdcache.util.DurationToSeconds;
+import org.greencheek.caching.herdcache.util.StaleCacheKeyCreator;
+import org.greencheek.caching.herdcache.util.futures.FutureCompleter;
+import org.greencheek.caching.herdcache.util.futures.SettableFuture;
+import org.greencheek.caching.herdcache.util.futures.DoNothingSettableFuture;
+import org.greencheek.caching.herdcache.util.futures.GuavaSettableFuture;
+import org.greencheek.caching.herdcache.util.keycreators.CacheKeyCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +39,8 @@ import java.util.function.Supplier;
  */
  class BaseMemcachedCache<V extends Serializable> implements RequiresShutdown,ClearableCache,
         SerializableOnlyCacheWithExpiry<V>, RevalidateInBackgroundCapableCache<V>
-         {
+{
+
 
     public static ConnectionFactory createMemcachedConnectionFactory(MemcachedCacheConfig config) {
         return SpyConnectionFactoryBuilder.createConnectionFactory(
@@ -64,8 +63,9 @@ import java.util.function.Supplier;
 
 
 
-    private final CacheWrite cacheWriter = new BasicCacheWrite();
-    private final CacheRead<V> cacheReader = new BasicCacheRead();
+    private final CacheWrite cacheWriter;
+    private final CacheWrite staleCacheWriter;
+    private final CacheRead<V> cacheReader;
     private static final Logger logger  = LoggerFactory.getLogger(BaseMemcachedCache.class);
 
     private final SettableFuture<V> DUMMY_FUTURE_NOT_TO_RETURN = new DoNothingSettableFuture<>();
@@ -73,8 +73,6 @@ import java.util.function.Supplier;
     private final ConcurrentMap<String,ListenableFuture<V>> DO_NOTHING_MAP = new NoOpConcurrentMap<>();
 
     private final MemcachedCacheConfig config;
-    private final KeyHashing keyHashingFunction;
-    private final String keyprefix;
     private final MemcachedClientFactory clientFactory;
     private final ConcurrentMap<String,ListenableFuture<V>> store;
     private final int staleMaxCapacityValue;
@@ -86,19 +84,18 @@ import java.util.function.Supplier;
 
     private final long memcachedGetTimeoutInMillis;
     private final long staleCacheMemachedGetTimeoutInMillis;
-    private final long waitForSetDurationInMillis;
 
     private final CacheValueComputationFailureHandler failureHandler;
 
     private final MetricRecorder metricRecorder;
+    private final CacheKeyCreator cacheKeyCreator;
 
 
     public BaseMemcachedCache(
             MemcachedClientFactory clientFactory,
             MemcachedCacheConfig config) {
         this.config = config;
-        this.keyprefix = config.getKeyPrefix();
-        keyHashingFunction = getKeyHashingFunction(config.getKeyHashType());
+        cacheKeyCreator = CacheKeyCreatorFactory.DEFAULT_INSTANCE.create(config);
         this.clientFactory = clientFactory;
 
         int maxCapacity = config.getMaxCapacity();
@@ -125,17 +122,24 @@ import java.util.function.Supplier;
 
 
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
+
         if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
             staleCacheMemachedGetTimeoutInMillis = memcachedGetTimeoutInMillis;
         } else {
             staleCacheMemachedGetTimeoutInMillis = config.getStaleCacheMemachedGetTimeout().toMillis();
         }
 
-        waitForSetDurationInMillis = config.getSetWaitDuration().toMillis();
-
         failureHandler = (String key, Throwable t) -> { store.remove(key); };
 
         metricRecorder = config.getMetricsRecorder();
+
+        cacheReader = new BasicCacheRead<>();
+
+        cacheWriter = config.isWaitForMemcachedSet() ?
+                new WaitForCacheWrite(metricRecorder,config.getSetWaitDuration().toMillis()) :
+                new NoWaitForCacheWrite(metricRecorder);
+
+        staleCacheWriter = new NoWaitForCacheWrite(metricRecorder);
     }
 
     private ConcurrentMap createInternalCache(boolean createCache,
@@ -157,62 +161,15 @@ import java.util.function.Supplier;
 
     }
 
-    private boolean isEnabled() {
-        return clientFactory.isEnabled();
-    }
 
 
     private void warnCacheDisabled() {
         logger.warn("Cache is disabled");
     }
 
-    private KeyHashing getKeyHashingFunction(KeyHashingType type) {
-       switch (type) {
-           case NONE:
-               return new NoKeyHashing();
-           case NATIVE_XXHASH:
-               return new FastestXXHashKeyHashing();
-           case NATIVE_XXHASH_64:
-               return new XXHashKeyHashing(true,true);
-           case JAVA_XXHASH:
-               return new JavaXXHashKeyHashing();
-           case JAVA_XXHASH_64:
-               return new XXHashKeyHashing(false,true);
-           case MD5_UPPER:
-               return new MessageDigestHashing(KeyHashing.MD5,Runtime.getRuntime().availableProcessors()*2,true);
-           case SHA256_UPPER:
-               return new MessageDigestHashing(KeyHashing.SHA256,Runtime.getRuntime().availableProcessors()*2,true);
-           case MD5_LOWER:
-               return new MessageDigestHashing(KeyHashing.MD5,Runtime.getRuntime().availableProcessors()*2,false);
-           case SHA256_LOWER:
-               return new MessageDigestHashing(KeyHashing.SHA256,Runtime.getRuntime().availableProcessors()*2,false);
-           default:
-               return new FastestXXHashKeyHashing();
-       }
-    }
 
     private String getHashedKey(String key) {
-        if(config.hasKeyPrefix()) {
-            if(config.isHashKeyPrefix()) {
-                return keyHashingFunction.hash(keyprefix + key);
-            } else {
-                return keyprefix + keyHashingFunction.hash(key);
-            }
-        } else {
-            return keyHashingFunction.hash(key);
-        }
-    }
-
-    private long getDuration(Duration timeToLive){
-        if(timeToLive==null || timeToLive == Duration.ZERO) {
-            return 0;
-        }
-        else {
-            long timeToLiveSec  = timeToLive.getSeconds();
-            return (timeToLiveSec >= 1l) ? timeToLiveSec : 0;
-        }
-
-
+        return cacheKeyCreator.createKey(key);
     }
 
     /**
@@ -314,32 +271,13 @@ import java.util.function.Supplier;
             else {
                 Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                 if(config.isUseStaleCache()) {
-                    return getFutureForStaleDistributedCacheLookup(client, createStaleCacheKey(keyString), future);
+                    return getFutureForStaleDistributedCacheLookup(client,
+                            StaleCacheKeyCreator.createKey(config, keyString), future);
                 } else {
                     return future;
                 }
             }
         }
-    }
-
-    private Callable<V> createGetFromDistributedCacheCallable(final Supplier<V> supplier, final String keyString) {
-        return () -> {
-            boolean ok = false;
-            V result = null;
-            try {
-                result = supplier.get();
-                ok = true;
-            } catch (Throwable throwable) {
-                ok = false;
-            }
-
-            if(ok && result!=null) {
-                Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-            } else {
-                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-            }
-            return result;
-        };
     }
 
     @Override
@@ -444,7 +382,10 @@ import java.util.function.Supplier;
 
                 if(validCachedObject || doRevalidationInBackground) {
                     Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-                    removeFutureFromInternalCache(promise, keyString, cachedObject, store);
+
+                    FutureCompleter.completeWithValue(promise, keyString, cachedObject, store,
+                            config.isRemoveFutureFromInternalCacheBeforeSettingValue());
+
                     if(doRevalidationInBackground) {
                         // return the future, but schedule update in background
                         // without tying to current future to the background update
@@ -459,11 +400,10 @@ import java.util.function.Supplier;
                     Throwable exceptionDuringWrite = cacheWriteFunction(client, computation,
                             keyString, timeToLive, executorService,
                             canCacheValueEvalutor, promise,store);
-//                            (V result) -> removeFutureFromInternalCache(promise, keyString, result, store),
-//                            (Throwable t) -> removeFutureFromInternalCacheWithException(promise, keyString, t, store));
 
                     if(exceptionDuringWrite!=null) {
-                        removeFutureFromInternalCacheWithException(promise, keyString, exceptionDuringWrite, store);
+                        FutureCompleter.completeWithException(promise, keyString, exceptionDuringWrite, store,
+                                config.isRemoveFutureFromInternalCacheBeforeSettingValue());
                     }
                 }
 
@@ -535,9 +475,6 @@ import java.util.function.Supplier;
                                                                 keyString, timeToLive, executorService,
                                                                 canCacheValueEvalutor,
                     DUMMY_FUTURE_NOT_TO_RETURN,backgroundRevalidationStore);
-//
-//                                                                (V result) -> backgroundRevalidationStore.remove(keyString),
-//                                                                (Throwable error) -> backgroundRevalidationStore.remove(keyString));
 
             if(ableSubmitForExecution!=null) {
                 backgroundRevalidationStore.remove(keyString);
@@ -545,27 +482,6 @@ import java.util.function.Supplier;
         }
     }
 
-    private void removeFutureFromInternalCache(SettableFuture<V> promise,String keyString, V cachedObject,
-                                               ConcurrentMap<String,ListenableFuture<V>> internalCache) {
-        if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-            internalCache.remove(keyString);
-            promise.set(cachedObject);
-        } else {
-            promise.set(cachedObject);
-            internalCache.remove(keyString);
-        }
-    }
-
-    private void removeFutureFromInternalCacheWithException(SettableFuture<V> promise,String keyString, Throwable exception,
-                                               ConcurrentMap<String,ListenableFuture<V>> internalCache) {
-        if(config.isRemoveFutureFromInternalCacheBeforeSettingValue()) {
-            internalCache.remove(keyString);
-            promise.setException(exception);
-        } else {
-            promise.setException(exception);
-            internalCache.remove(keyString);
-        }
-    }
 
     /**
      * Checks if we should: return the future that has been found in the herd cache map, which is a another call that is
@@ -582,7 +498,7 @@ import java.util.function.Supplier;
                                                          ListeningExecutorService executor) {
         Cache.logCacheHit(metricRecorder, keyRequested, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
         if(config.isUseStaleCache()) {
-            String staleCacheKey = createStaleCacheKey(keyRequested);
+            String staleCacheKey = StaleCacheKeyCreator.createKey(config, keyRequested);
             return getFutureForStaleDistributedCacheLookup(client, staleCacheKey, cachedFuture);
         } else {
             return cachedFuture;
@@ -620,10 +536,12 @@ import java.util.function.Supplier;
                     metricRecorder);
 
             if(item==null) {
-                removeFutureFromInternalCache(promise, key, null, staleStore);
+                FutureCompleter.completeWithValue(promise, key, null, staleStore,
+                        config.isRemoveFutureFromInternalCacheBeforeSettingValue());
                 return backendFuture;
             } else {
-                removeFutureFromInternalCache(promise, key, item, staleStore);
+                FutureCompleter.completeWithValue(promise, key, item, staleStore,
+                        config.isRemoveFutureFromInternalCacheBeforeSettingValue());
                 return promise;
             }
 
@@ -649,9 +567,8 @@ import java.util.function.Supplier;
                                                  final Duration itemExpiry,
                                                  final Predicate<V> canCacheValue,
                                                  final SettableFuture<V> future,
-                                                 final ConcurrentMap<String,ListenableFuture<V>> cachedFutures) {
-//                                                 final SuccessCallback<V> successFutureCallBack,
-//                                                 final FailureCallback failureFutureCallBack) {
+                                                 final ConcurrentMap<String,ListenableFuture<V>> cachedFutures)
+    {
         return () -> {
             final long startNanos =  System.nanoTime();
             boolean ok = false;
@@ -676,10 +593,7 @@ import java.util.function.Supplier;
                             cacheWriter.writeToDistributedCache(client,
                                     key,
                                     results,
-                                    (int) getDuration(itemExpiry),
-                                    config.isWaitForMemcachedSet(),
-                                    waitForSetDurationInMillis,
-                                    metricRecorder);
+                                    DurationToSeconds.getSeconds(itemExpiry));
                         } else {
                             logger.debug("Cache Value cannot be cached, as determine by predicate. Therefore, not storing in memcached");
                         }
@@ -688,14 +602,15 @@ import java.util.function.Supplier;
                     }
 
                     metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
-                    removeFutureFromInternalCache(future,key,results,cachedFutures);
-//                    successFutureCallBack.onSuccess(results);
+                    FutureCompleter.completeWithValue(future, key, results, cachedFutures,
+                            config.isRemoveFutureFromInternalCacheBeforeSettingValue());
 
                 } else {
                     metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
                     metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
-                    removeFutureFromInternalCacheWithException(future,key,throwable,cachedFutures);
-//                    failureFutureCallBack.onFailure(throwable);
+                    FutureCompleter.completeWithException(future, key, throwable, cachedFutures,
+                            config.isRemoveFutureFromInternalCacheBeforeSettingValue());
+
                 }
                 return results;
             }
@@ -719,13 +634,10 @@ import java.util.function.Supplier;
                                                    final Predicate<V> canCacheValue,
                                                    final SettableFuture<V> future,
                                                    final ConcurrentMap<String,ListenableFuture<V>> cachedFutureStore
-//                                                   final SuccessCallback<V> successFutureCallBack,
-//                                                   final FailureCallback failureFutureCallBack
 
     ) {
         try {
             executorService.submit(
-//                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,successFutureCallBack,failureFutureCallBack));
                     createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,future,cachedFutureStore));
 
         } catch(Throwable failedToSubmit) {
@@ -741,23 +653,15 @@ import java.util.function.Supplier;
     private void writeToDistributedStaleCache(ReferencedClient client,String key,Duration ttl,
                                    V valueToWriteToCache) {
         if (config.isUseStaleCache()) {
-            String staleCacheKey =  createStaleCacheKey(key);
+            String staleCacheKey = StaleCacheKeyCreator.createKey(config,key);
             Duration staleCacheExpiry = ttl.plus(staleCacheAdditionalTimeToLiveValue);
             // overwrite the stale cache entry
-            cacheWriter.writeToDistributedCache(client,
+            staleCacheWriter.writeToDistributedCache(client,
                     staleCacheKey,
                     valueToWriteToCache,
-                    (int)getDuration(staleCacheExpiry),
-                    false,
-                    waitForSetDurationInMillis,
-                    metricRecorder);
+                    DurationToSeconds.getSeconds(staleCacheExpiry));
 
         }
-    }
-
-
-    private String createStaleCacheKey(String key) {
-        return config.getStaleCachePrefix() + key;
     }
 
 
@@ -836,7 +740,7 @@ import java.util.function.Supplier;
             key = getHashedKey(key);
             long millisToWait = config.getWaitForRemove().toMillis();
             if (config.isUseStaleCache()) {
-                Future<Boolean> staleCacheFuture = client.delete(createStaleCacheKey(key));
+                Future<Boolean> staleCacheFuture = client.delete(StaleCacheKeyCreator.createKey(config, key));
                 if (staleCacheFuture != null) {
                     waitForDelete(staleCacheFuture, millisToWait, key, "stale cache");
                 }

@@ -164,7 +164,7 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
      * @see net.spy.memcached.Transcoder#encode(java.lang.Object)
      */
     public CachedData encode(Object o) {
-        byte[] b = null;
+        byte[] b;
         int flags = 0;
         if (o instanceof String) {
             b = encodeString((String) o);
@@ -197,19 +197,29 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
             flags |= SERIALIZED;
         }
         assert b != null;
-        if (b.length > getCompressionThreshold()) {
-            byte[] compressed = compress(b);
-            if (compressed.length < b.length) {
-                logger.debug("Compressed {} from {} to {}",
-                        o.getClass().getName(), b.length, compressed.length);
-                b = compressed;
-                flags |= COMPRESSED;
-            } else {
-                logger.info("Compression increased the size of {} from {} to {}",
-                        o.getClass().getName(), b.length, compressed.length);
-            }
+
+        byte[] compressed = compressBytes(b);
+        flags = isCompressed(flags,b,compressed);
+
+        metricRecorder.updateHistogram(ENCODED_BYTES_METRIC_NAME,compressed.length);
+        return new CachedData(flags, compressed, getMaxSize());
+    }
+
+    private int isCompressed(int flags, byte[] orig,byte[] compressed) {
+        if (compressed.length < orig.length) {
+            logger.debug("Compressed bytes from {} to {}",orig.length, compressed.length);
+            return (flags | COMPRESSED);
+        } else {
+            logger.debug("Compression increased the size from {} to {}", orig.length, compressed.length);
+            return flags;
         }
-        metricRecorder.updateHistogram(ENCODED_BYTES_METRIC_NAME,b.length);
-        return new CachedData(flags, b, getMaxSize());
+    }
+
+    private byte[] compressBytes(byte[] uncompressed) {
+        if (uncompressed.length > getCompressionThreshold()) {
+            return compress(uncompressed);
+        } else {
+            return uncompressed;
+        }
     }
 }
