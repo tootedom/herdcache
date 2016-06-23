@@ -158,68 +158,105 @@ public class SerializingTranscoder extends BaseSerializingTranscoder implements
         return rv;
     }
 
+    class EncodedData {
+        byte[] encoded;
+        int flags = 0;
+    }
+
+    private void encodeLong(EncodedData data,Long o) {
+        data.encoded = tu.encodeLong(o);
+        data.flags |= SPECIAL_LONG;
+    }
+
+    private void encodeInteger(EncodedData data,Integer o) {
+        data.encoded = tu.encodeInt(o);
+        data.flags |= SPECIAL_INT;
+    }
+
+    private void encodeBoolean(EncodedData data,Boolean o) {
+        data.encoded = tu.encodeBoolean(o);
+        data.flags |= SPECIAL_BOOLEAN;
+    }
+
+    private void encodeDate(EncodedData data,Date o) {
+        data.encoded = tu.encodeLong(o.getTime());
+        data.flags |= SPECIAL_DATE;
+    }
+
+    private void encodeByte(EncodedData data,Byte o) {
+        data.encoded = tu.encodeByte(o);
+        data.flags |= SPECIAL_BYTE;
+    }
+
+    private void encodeFloat(EncodedData data,Float o) {
+        data.encoded = tu.encodeInt(Float.floatToRawIntBits(o));
+        data.flags |= SPECIAL_FLOAT;
+    }
+
+    private void encodeDouble(EncodedData data,Double o) {
+        data.encoded = tu.encodeLong(Double.doubleToRawLongBits(o));
+        data.flags |= SPECIAL_DOUBLE;
+    }
+
+    private void encodeByteArray(EncodedData data,byte[] o) {
+        data.encoded = o;
+        data.flags |= SPECIAL_BYTEARRAY;
+    }
+
+    private void encodeObject(EncodedData data,Object o) {
+        data.encoded = serialize(o);
+        data.flags |= SERIALIZED;
+    }
     /*
      * (non-Javadoc)
      *
      * @see net.spy.memcached.Transcoder#encode(java.lang.Object)
      */
     public CachedData encode(Object o) {
-        byte[] b;
-        int flags = 0;
+        EncodedData data = new EncodedData();
+
         if (o instanceof String) {
-            b = encodeString((String) o);
+            data.encoded = encodeString((String) o);
         } else if (o instanceof Long) {
-            b = tu.encodeLong((Long) o);
-            flags |= SPECIAL_LONG;
+            encodeLong(data,(Long)o);
         } else if (o instanceof Integer) {
-            b = tu.encodeInt((Integer) o);
-            flags |= SPECIAL_INT;
+            encodeInteger(data,(Integer)o);
         } else if (o instanceof Boolean) {
-            b = tu.encodeBoolean((Boolean) o);
-            flags |= SPECIAL_BOOLEAN;
+            encodeBoolean(data, (Boolean) o);
         } else if (o instanceof Date) {
-            b = tu.encodeLong(((Date) o).getTime());
-            flags |= SPECIAL_DATE;
+            encodeDate(data,(Date)o);
         } else if (o instanceof Byte) {
-            b = tu.encodeByte((Byte) o);
-            flags |= SPECIAL_BYTE;
+            encodeByte(data, (Byte) o);
         } else if (o instanceof Float) {
-            b = tu.encodeInt(Float.floatToRawIntBits((Float) o));
-            flags |= SPECIAL_FLOAT;
+            encodeFloat(data,(Float)o);
         } else if (o instanceof Double) {
-            b = tu.encodeLong(Double.doubleToRawLongBits((Double) o));
-            flags |= SPECIAL_DOUBLE;
+            encodeDouble(data,(Double)o);
         } else if (o instanceof byte[]) {
-            b = (byte[]) o;
-            flags |= SPECIAL_BYTEARRAY;
+            encodeByteArray(data,(byte[])o);
         } else {
-            b = serialize(o);
-            flags |= SERIALIZED;
+            encodeObject(data,o);
         }
-        assert b != null;
+        assert data.encoded != null;
 
-        byte[] compressed = compressBytes(b);
-        flags = isCompressed(flags,b,compressed);
-
-        metricRecorder.updateHistogram(ENCODED_BYTES_METRIC_NAME,compressed.length);
-        return new CachedData(flags, compressed, getMaxSize());
+        compress(data,o);
+        metricRecorder.updateHistogram(ENCODED_BYTES_METRIC_NAME,data.encoded.length);
+        return new CachedData(data.flags, data.encoded, getMaxSize());
     }
 
-    private int isCompressed(int flags, byte[] orig,byte[] compressed) {
-        if (compressed.length < orig.length) {
-            logger.debug("Compressed bytes from {} to {}",orig.length, compressed.length);
-            return (flags | COMPRESSED);
-        } else {
-            logger.debug("Compression increased the size from {} to {}", orig.length, compressed.length);
-            return flags;
-        }
-    }
 
-    private byte[] compressBytes(byte[] uncompressed) {
-        if (uncompressed.length > getCompressionThreshold()) {
-            return compress(uncompressed);
-        } else {
-            return uncompressed;
+    private void compress(EncodedData data, Object o) {
+        int uncompressedLength = data.encoded.length;
+        if (uncompressedLength > getCompressionThreshold()) {
+            byte[] compressed = compress(data.encoded);
+            if (compressed.length < uncompressedLength) {
+                logger.debug("Compressed {} from {} to {}",
+                        o.getClass().getName(), uncompressedLength, compressed.length);
+                data.encoded = compressed;
+                data.flags |= COMPRESSED;
+            } else {
+                logger.info("Compression increased the size of {} from {} to {}",
+                        o.getClass().getName(), uncompressedLength, compressed.length);
+            }
         }
     }
 }

@@ -581,33 +581,33 @@ import java.util.function.Supplier;
                 throwable = err;
             } finally {
                 long time = System.nanoTime()-startNanos;
-                metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,time);
-
                 if(ok) {
-                    metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,time);
-
-                    if (results != null) {
-                        if (canCacheValue.test(results)) {
-                            writeToDistributedStaleCache(client, key, itemExpiry, results);
-                            // write the cache entry
-                            cacheWriter.writeToDistributedCache(client,
-                                    key,
-                                    results,
-                                    DurationToSeconds.getSeconds(itemExpiry));
-                        } else {
-                            logger.debug("Cache Value cannot be cached, as determine by predicate. Therefore, not storing in memcached");
-                        }
+                    boolean isNotNullResults = results != null;
+                    boolean isCacheable = canCacheValue.test(results);
+                    if (isNotNullResults && isCacheable) {
+                        writeToDistributedStaleCache(client, key, itemExpiry, results);
+                        // write the cache entry
+                        cacheWriter.writeToDistributedCache(client,
+                                key,
+                                results,
+                                DurationToSeconds.getSeconds(itemExpiry));
                     } else {
-                        logger.debug("Cache Value computation was null, not storing in memcached");
+                        logger.debug("Cache Value cannot be cached.  It is either null:({}), or not cachable as determine by predicate:({}). " +
+                                    "Therefore, not storing in memcached",!isNotNullResults,!isCacheable);
                     }
 
-                    metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+                    setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,
+                                         time,
+                                         CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+
                     FutureCompleter.completeWithValue(future, key, results, cachedFutures,
                             config.isRemoveFutureFromInternalCacheBeforeSettingValue());
 
                 } else {
-                    metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
-                    metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,time);
+                    setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,
+                            time,
+                            CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
+
                     FutureCompleter.completeWithException(future, key, throwable, cachedFutures,
                             config.isRemoveFutureFromInternalCacheBeforeSettingValue());
 
@@ -616,6 +616,13 @@ import java.util.function.Supplier;
             }
         };
     }
+
+    private void setCacheWriteMetrics(String timerMetricName, long duration, String counterMetricName) {
+        metricRecorder.setDuration(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_ALL_TIMER,duration);
+        metricRecorder.setDuration(timerMetricName,duration);
+        metricRecorder.incrementCounter(counterMetricName);
+    }
+
     /**
      * write to memcached when the future completes, the generated value,
      * against the given key, with the specified expiry
