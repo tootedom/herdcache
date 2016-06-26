@@ -49,6 +49,9 @@ public class TestNullValueMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        executorService.shutdownNow();
+
     }
 
     @Test

@@ -3,6 +3,7 @@ package org.greencheek.caching.herdcache;
 import com.google.common.util.concurrent.*;
 import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.lru.SimpleLastRecentlyUsedCache;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -23,6 +24,11 @@ public class SimpleLastRecentlyUsedCacheTest implements AwaitOnFuture {
     public void setUp() {
         executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
         cache = new SimpleLastRecentlyUsedCache<>();
+    }
+
+    @After
+    public void tearDown() {
+        executorService.shutdownNow();
     }
 
 

@@ -56,6 +56,9 @@ public class TestSimpleElastiCacheMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        executorService.shutdownNow();
+
     }
 
     private void testHashAlgorithm(HashAlgorithm algo) {

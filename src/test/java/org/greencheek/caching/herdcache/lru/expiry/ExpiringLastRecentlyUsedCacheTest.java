@@ -6,6 +6,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import org.greencheek.caching.herdcache.Cache;
 import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.lru.SimpleLastRecentlyUsedCache;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -28,6 +29,11 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
     public void setUp() {
         executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
         cache = new ExpiringLastRecentlyUsedCache<>(1000,1000,10000,1000, TimeUnit.MILLISECONDS);
+    }
+
+    @After
+    public void tearDown() {
+        executorService.shutdownNow();
     }
 
     @Test

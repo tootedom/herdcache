@@ -88,6 +88,9 @@ public class TestStaleMemcachedCaching {
         }
 
         reporter.close();
+
+        executorService.shutdownNow();
+
     }
 
 

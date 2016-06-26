@@ -74,6 +74,9 @@ public class TestForceConfigReconnectionElastiCacheMemcachedCaching {
         if(cache!=null && cache instanceof RequiresShutdown) {
             ((RequiresShutdown) cache).shutdown();
         }
+
+        executorService.shutdownNow();
+
     }
 
     private void testCaching(CacheWithExpiry cache) {

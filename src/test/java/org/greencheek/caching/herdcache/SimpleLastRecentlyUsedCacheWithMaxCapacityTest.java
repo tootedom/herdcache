@@ -5,6 +5,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import org.greencheek.caching.herdcache.await.AwaitOnFuture;
 import org.greencheek.caching.herdcache.lru.SimpleLastRecentlyUsedCache;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -22,6 +23,11 @@ public class SimpleLastRecentlyUsedCacheWithMaxCapacityTest implements AwaitOnFu
     public void setUp() {
         executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
         cache = new SimpleLastRecentlyUsedCache<>(2);
+    }
+
+    @After
+    public void tearDown() {
+        executorService.shutdownNow();
     }
 
 
