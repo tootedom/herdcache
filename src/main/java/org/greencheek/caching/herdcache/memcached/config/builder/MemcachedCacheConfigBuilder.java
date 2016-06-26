@@ -23,7 +23,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Created by dominictootell on 23/08/2014.
+ *
  */
 public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfigBuilder<T>> implements CacheConfigBuilder<T> {
 

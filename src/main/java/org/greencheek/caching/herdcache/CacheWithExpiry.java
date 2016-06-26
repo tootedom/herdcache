@@ -32,7 +32,8 @@ public interface CacheWithExpiry<V> extends Cache<V> {
      * return.  The Predicate evaluates the cached value, if it returns true, the cached value should be allowed,
      * otherwise the @link #computation Supplier is called to provide the value.  The @link #canCacheValueEvalutor
      * predicate is used to evaluate if the value returned by the @link #computation Supplier should be cached or not.
-     * The item is stored in the cache with an infinite TTL
+     * The item is stored in the cache with a TTL (time to live) that is determined by the implementation.  The default
+     * is for an infinite TTL (ZERO seconds)
      *
      * @param key The key to obtain/cache a value under
      * @param computation The function that would calculate the value to be cached
@@ -66,15 +67,30 @@ public interface CacheWithExpiry<V> extends Cache<V> {
                                      Predicate<V> isCachedValueValid);
 
 
+
+
     /**
      * Set the cache value under that given key with the specified value
      * @param keyString The key under which to cache the object
-     * @param value The value to store in the cache
+     * @param value Supplier that generates the value that might be stored in the cache
+     * @param timeToLive How long the value should be cached for
      * @return
      */
-    default public ListenableFuture<V> set(String keyString, V value) {
-        return set(keyString,value, MoreExecutors.newDirectExecutorService());
+    default public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive) {
+        return set(keyString,value,timeToLive,MoreExecutors.newDirectExecutorService());
     }
+
+    /**
+     * Set the cache value under that given key with the specified value
+     * @param keyString The key under which to cache the object
+     * @param value the value that might be stored in the cache
+     * @param timeToLive How long the value should be cached for
+     * @return
+     */
+    default ListenableFuture<V> set(String keyString, V value, Duration timeToLive) {
+        return set(keyString,value,timeToLive,MoreExecutors.newDirectExecutorService());
+    }
+
 
     /**
      * Set the cache value, with the given key (implementations will/may modify the key based on
@@ -85,7 +101,23 @@ public interface CacheWithExpiry<V> extends Cache<V> {
      * @param executorService The executor under which to execute the cache write operation
      * @return
      */
-    public ListenableFuture<V> set(String keyString, V value, ListeningExecutorService executorService);
+    default public ListenableFuture<V> set(String keyString, V value, Duration timeToLive, ListeningExecutorService executorService) {
+        return set(keyString,() ->value ,timeToLive,executorService);
+    }
+
+
+    /**
+     * Set the cache value, with the given key (implementations will/may modify the key based on
+     * hashing algorithms).  The value is set potentially in the background, using a thread from the
+     * given executor.
+     * @param keyString The key under which to cache the object
+     * @param value Supplier that generates the value that might be stored in the cache
+     * @param executorService The executor under which to execute the cache write operation
+     * @return
+     */
+    default public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive, ListeningExecutorService executorService) {
+        return set(keyString,value,timeToLive,IsSupplierValueCachable.GENERATED_VALUE_IS_ALWAYS_CACHABLE,executorService);
+    }
 
 
     /**

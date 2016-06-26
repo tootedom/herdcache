@@ -3,6 +3,7 @@ package org.greencheek.caching.herdcache.lru.expiry;
 import com.google.common.util.concurrent.*;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
+import org.greencheek.caching.herdcache.IsSupplierValueCachable;
 
 import java.sql.Time;
 import java.time.Duration;
@@ -13,6 +14,11 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 
+/**
+ * Do not use.  Not fully supported.  Will be removed in future version
+ * @param <V>
+ */
+@Deprecated
 public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
 
     private enum TimedEntryType { TTL_ONLY, TTL_WITH_IDLE}
@@ -84,6 +90,12 @@ public class ExpiringLastRecentlyUsedCache<V> implements Cache<V> {
             }
         }
     }
+
+    @Override
+    public ListenableFuture<V> set(String keyString, Supplier<V> value, Predicate<V> canCacheValueEvalutor, ListeningExecutorService executorService) {
+        return insertTimedEntry(keyString,value,executorService,canCacheValueEvalutor);
+    }
+
 
     private TimedEntry<V> createTimedEntry(SettableFuture<V> future) {
         TimedEntry<V> entry;

@@ -416,13 +416,8 @@ import java.util.function.Supplier;
     }
 
     @Override
-    public ListenableFuture<V> set(String keyString, V value) {
-        return set(keyString,value,MoreExecutors.newDirectExecutorService());
-    }
-
-    @Override
-    public ListenableFuture<V> set(String keyString, V value, ListeningExecutorService executorService) {
-        return set(keyString, () -> value,config.getTimeToLive(),Cache.CAN_ALWAYS_CACHE_VALUE, executorService);
+    public ListenableFuture<V> set(String keyString, Supplier<V> value, Predicate<V> canCacheValueEvalutor, ListeningExecutorService executorService) {
+        return set(keyString, value, config.getTimeToLive(), canCacheValueEvalutor, executorService);
     }
 
     @Override
@@ -561,58 +556,51 @@ import java.util.function.Supplier;
     }
 
 
-    private Callable<V> createCacheWriteCallable(final ReferencedClient client,
-                                                 final Supplier<V> computation,
-                                                 final String key,
-                                                 final Duration itemExpiry,
-                                                 final Predicate<V> canCacheValue,
-                                                 final SettableFuture<V> future,
-                                                 final ConcurrentMap<String,ListenableFuture<V>> cachedFutures)
+    private Runnable createCacheWriteRunnable(final ReferencedClient client,
+                                              final Supplier<V> computation,
+                                              final String key,
+                                              final Duration itemExpiry,
+                                              final Predicate<V> canCacheValue,
+                                              final SettableFuture<V> future,
+                                              final ConcurrentMap<String, ListenableFuture<V>> cachedFutures)
     {
         return () -> {
             final long startNanos =  System.nanoTime();
-            boolean ok = false;
-            V results = null;
             Throwable throwable = null;
             try {
-                results = computation.get();
-                ok = true;
+                V results = computation.get();
+                long time = System.nanoTime()-startNanos;
+                boolean isNotNullResults = (results != null);
+                boolean isCacheable = canCacheValue.test(results);
+                if (isNotNullResults & isCacheable) {
+                    writeToDistributedStaleCache(client, key, itemExpiry, results);
+                    // write the cache entry
+                    cacheWriter.writeToDistributedCache(client,
+                            key,
+                            results,
+                            DurationToSeconds.getSeconds(itemExpiry));
+                } else {
+                    logger.debug("Cache Value cannot be cached.  It has to be either not null:({}), or cachable as determine by predicate:({}). " +
+                            "Therefore, not storing in memcached",isNotNullResults,isCacheable);
+                }
+
+                setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,
+                        time,
+                        CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+
+                FutureCompleter.completeWithValue(future, key, results, cachedFutures,
+                        config.isRemoveFutureFromInternalCacheBeforeSettingValue());
+
             } catch(Throwable err){
                 throwable = err;
-            } finally {
                 long time = System.nanoTime()-startNanos;
-                if(ok) {
-                    boolean isNotNullResults = results != null;
-                    boolean isCacheable = canCacheValue.test(results);
-                    if (isNotNullResults && isCacheable) {
-                        writeToDistributedStaleCache(client, key, itemExpiry, results);
-                        // write the cache entry
-                        cacheWriter.writeToDistributedCache(client,
-                                key,
-                                results,
-                                DurationToSeconds.getSeconds(itemExpiry));
-                    } else {
-                        logger.debug("Cache Value cannot be cached.  It is either null:({}), or not cachable as determine by predicate:({}). " +
-                                    "Therefore, not storing in memcached",!isNotNullResults,!isCacheable);
-                    }
 
-                    setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_TIMER,
-                                         time,
-                                         CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_SUCCESS_COUNTER);
+                setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,
+                        time,
+                        CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
 
-                    FutureCompleter.completeWithValue(future, key, results, cachedFutures,
-                            config.isRemoveFutureFromInternalCacheBeforeSettingValue());
-
-                } else {
-                    setCacheWriteMetrics(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_TIMER,
-                            time,
-                            CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_FAILURE_COUNTER);
-
-                    FutureCompleter.completeWithException(future, key, throwable, cachedFutures,
-                            config.isRemoveFutureFromInternalCacheBeforeSettingValue());
-
-                }
-                return results;
+                FutureCompleter.completeWithException(future, key, throwable, cachedFutures,
+                        config.isRemoveFutureFromInternalCacheBeforeSettingValue());
             }
         };
     }
@@ -645,7 +633,7 @@ import java.util.function.Supplier;
     ) {
         try {
             executorService.submit(
-                    createCacheWriteCallable(client,computation,key,itemExpiry,canCacheValue,future,cachedFutureStore));
+                    createCacheWriteRunnable(client, computation, key, itemExpiry, canCacheValue, future, cachedFutureStore));
 
         } catch(Throwable failedToSubmit) {
             metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION_REJECTION_COUNTER);

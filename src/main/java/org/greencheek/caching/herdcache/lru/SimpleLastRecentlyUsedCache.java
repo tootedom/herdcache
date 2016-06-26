@@ -6,12 +6,19 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import org.greencheek.caching.herdcache.Cache;
+import org.greencheek.caching.herdcache.IsCachedValueUsable;
+import org.greencheek.caching.herdcache.IsSupplierValueCachable;
 
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 
+/**
+ * Not fully supported.  Do not use.  Will be removed in future version
+ * @param <V>
+ */
+@Deprecated
 public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
 
     private final ConcurrentMap<String,ListenableFuture<V>> store;
@@ -60,6 +67,11 @@ public class SimpleLastRecentlyUsedCache<V> implements Cache<V> {
         } else {
             return future;
         }
+    }
+
+    @Override
+    public ListenableFuture<V> set(String keyString, Supplier<V> value, Predicate<V> canCacheValueEvalutor, ListeningExecutorService executorService) {
+        return apply(keyString,value,executorService,canCacheValueEvalutor,IsCachedValueUsable.CACHED_VALUE_IS_ALWAYS_USABLE);
     }
 
     /**
