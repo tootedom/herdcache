@@ -1,2 +1,2 @@
 Benchmark              Mode  Cnt  Score   Error   Units
-LotsOfSets.applySets  thrpt   40  0.367 ± 0.012  ops/ms
+LotsOfSets.applySets  thrpt   40  0.418 ± 0.003  ops/ms

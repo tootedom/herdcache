@@ -1,9 +1,9 @@
 package org.greencheek.caching.herdcache.lru;
 
 import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.SettableFuture;
 
 import java.util.function.Consumer;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Created by dominictootell on 28/07/2014.

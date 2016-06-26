@@ -12,7 +12,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Created by dominictootell on 23/08/2014.
+ *
  */
 public class MemcachedCacheConfig {
 
@@ -44,6 +44,7 @@ public class MemcachedCacheConfig {
     private final Duration waitForRemove;
     private final MetricRecorder metricsRecorder;
     private final LocatorFactory locatorFactory;
+    private final boolean herdProtectionEnabled;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -72,7 +73,8 @@ public class MemcachedCacheConfig {
                                 boolean hashKeyPrefix,
                                 Duration waitForRemove,
                                 MetricRecorder metricsRecorder,
-                                LocatorFactory locatorFactory) {
+                                LocatorFactory locatorFactory,
+                                boolean herdProtectionEnabled) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -101,6 +103,7 @@ public class MemcachedCacheConfig {
         this.waitForRemove = waitForRemove;
         this.metricsRecorder = metricsRecorder;
         this.locatorFactory = locatorFactory;
+        this.herdProtectionEnabled = herdProtectionEnabled;
     }
 
     public Duration getTimeToLive() {
@@ -225,5 +228,13 @@ public class MemcachedCacheConfig {
 
     public LocatorFactory getLocatorFactory() {
         return locatorFactory;
+    }
+
+    /**
+     * Should the internal future caches be enabled (herd protection for backends)
+     * @return
+     */
+    public boolean isHerdProtectionEnabled() {
+        return herdProtectionEnabled;
     }
 }

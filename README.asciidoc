@@ -8,22 +8,33 @@ toc::[]
 The cache borrows heavily from the concepts, and implementation 
 of caching in http://spray.io/documentation/1.2.1/spray-caching/[spray-caching]
 
-The idea here being that the cache stores a future rather than the value, rather than
-values of a given generic type.  The benefit of this approach is that is that is has the advantage, that it
-nicely takes care of thundering herds/cache miss storm issue.  Which is where many requests
-to a particular cache key (e.g. a resource URI) arrive before the first one could be completed. The result
-being that the cache key is requested ( the processing associated with calculating the value is performed ) multiple
+The idea here being that the cache returns a future rather than a value.  The value is that of a given generic type.
+The benefit of this approach is that it nicely takes care of thundering herds/cache miss storm issue.
+
+This is where many requests to a particular cache key (e.g. a resource URI) arrive at the same time.  I.e. a popular news
+story or similar.  The result is you have a lot of requests to the same memcached server, at the same time, to fetch the same value.
+This puts huge load on that 1 memcached server, which could result in an outage.  If the item is not in the cache all the requests
+end up hitting the upstream services that generate the cache value.
+
+The result being that the cache key is requested ( the processing associated with calculating the value is performed ) multiple
 times.  As a result the backend resource is put under undue load.
 
-Storing a future in the cache means that multiple resources for a missing cache value that hasn't been calculated,
+Returning a future from the cache means that multiple resources for a missing cache value that hasn't been calculated,
 wait on the same future that is executing for the initial/first request for the cache key.
+
+Returning a future also means that one request for a cache value from memcached can satisfy many requests.
 
 '''
 
 = Usage
 
-The below details how to use the caching implementations, the differences between them.
+The below details how to use the caching implementation, and the various ways to talk to the cache, which fall into 3 categories:
 
+- GET (check if a value is in the cache)
+- SET (set a value regardless of it is exists or not)
+- APPLY (only set a value, if it doesn't exist currently)
+
+Each of the write methods, apply and set, allow the value to be calculated from a Supplier<V> function.
 
 == Dependency
 
@@ -41,37 +52,40 @@ a couple of get methods.  Therefore, introduction a breaking change with the old
 
 == Cache Types
 
-There are currently two types of Cache that implement the `Cache<V>` interface:
-
-- `SimpleLastRecentlyUsedCache`
-- `ExpiringLastRecentlyUsedCache`
-
-And two types of Cache that implement the `CacheWithExpiry<V>` that extends upon the `Cache<V>` interface:
+There are currently two types of Cache interface. `Cache<V>` interface and the `CacheWithExpiry<V>` that extends upon the `Cache<V>`
+The two implementation's of the `CacheWithExpiry<V>`.
 
 - `SpyMemcachedCache<V>`
 - `ElastiCacheMemcachedCache<V>`
 
+The are a couple of implementations of the `Cache<V>` interface.  However, these are deprecated and will not be discussed
+further:
+
+- `SimpleLastRecentlyUsedCache<V>`
+- `ExpiringLastRecentlyUsedCache<V>`
+
+
+
 == `Cache` Interface
 
-The cache used to have a single method `apply` that takes:
+The cache interface that the beginning of its life, used to have a single method `apply` that took:
 
 - The key to look for
 - An implementation of the http://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html[`Supplier<T>`] functional interface
 - The guava http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListeningExecutorService.html[`ListeningExecutorService`] executor
 
-The method is: `ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService)`
+That method was: `ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService)`
 
 The returned value is that of http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture],
 upon which you can attach a callback, or wait for a value to be generated:
 
-The cache now includes two additional methods:
+The cache has now been extended to have more methods, as well as the introduction of a second interface `CacheWithExpiry<V>`.
+You will probably most likely work with the `CacheWithExpiry` interface.
 
-- `public ListenableFuture<V> get(String key)`
-- `public ListenableFuture<V> get(String key,ListeningExecutorService executorService)`
-
-
-Both methods lookup a value in the cache that is associated with a value.  The difference between the `get` and the `apply`,
-is that the `apply` can generate the value, whilst the `get` only looks up in the cache.
+As mentioned there are 3 types of methods on the interfaces: get, set, apply
+Both method types, get and apply, lookup a value in the cache that is associated with a key.  The difference between the `get` and the `apply`,
+is that the `apply` can generate the value, whilst the `get` only looks up in the cache.  The set on the other hand only ever
+sets a value in the cache.
 
 Both get methods lookup a cache value, always returning a
 http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/util/concurrent/ListenableFuture.html[Guava's ListenableFuture]
@@ -119,129 +133,47 @@ Futures.addCallback(val,new FutureCallback<String>() {
         } catch (InterruptedException e) {
 
         } catch (ExecutionException e) {
-
+            // Any exception that occurred in the Supplier will be the .getCause()
         }
 ----
 
 '''
 
-=== SimpleLastRecentlyUsedCache
-
-This cache uses a https://code.google.com/p/concurrentlinkedhashmap/[ConcurrentLinkedHashMap] to store a maximum number
-of values in the cache.  Once the cache hit the maximum number of values, the key that has been Last recently used is
-removed
+== `CacheWithExpiry` Interface
 
 
-==== Examples
+More likely than not, you will be interacting with this interface.  This interface extends upon the `Cache<V>` interface
+to allow you to provide method level durations for items stored in the cache.
 
-[source,java]
-----
-ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
-Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
+The list of available methods are:
 
-ListenableFuture<String> val = cache.apply("Key1",
-                                           () -> {
-                                                try {
-                                                    Thread.sleep(1000);
-                                                } catch (InterruptedException e) {
-                                                    e.printStackTrace();
-                                                }
-                                                return "key1";
-                                           },
-                                           executorService);
-----
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,Predicate<V> canCacheValueEvalutor)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService,Predicate<V> canCacheValueEvalutor,Predicate<V> isCachedValueUsable);`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService, Predicate<V> isSupplierValueCachable)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, ListeningExecutorService executorService, Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)`
+- `public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService, Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)`
 
+- `public ListenableFuture<V> get(String key)`
+- `public ListenableFuture<V> get(String key,ListeningExecutorService executorService)`
 
-The `SimpleLastRecentlyUsedCache` has no expiry on the items in the cache.  It is just limited by the number of
-items in the cache and the item that has been last recently used.
-
-This can be seen in the following example:
-
-[source,java]
-----
-ListeningExecutorService executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
-Cache<String> cache = new SimpleLastRecentlyUsedCache<>();
-
-ListenableFuture<String> val = cache.apply("Key1", () -> {
-  try {
-     Thread.sleep(1000);
-  } catch (InterruptedException e) {
-     e.printStackTrace();
-  }
-  return "key1";
-}, executorService);
+- `public ListenableFuture<V> set(String keyString, V value)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value)`
+- `public ListenableFuture<V> set(String keyString, V value, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value, Predicate<V> canCacheValueEvalutor, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator,ListeningExecutorService executorService)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive)`
+- `public ListenableFuture<V> set(String keyString, V value, Duration timeToLive)`
+- `public ListenableFuture<V> set(String keyString, V value, Duration timeToLive, ListeningExecutorService executorService)`
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive, ListeningExecutorService executorService)
 
 
-ListenableFuture<String> val2 = cache.apply("key2", () -> {
-  try {
-     Thread.sleep(500);
-  } catch (InterruptedException e) {
-     e.printStackTrace();
-  }
-  return "key2";
-}, executorService);
+The `apply(...)` method returns a Future that wraps both the lookup for the cache value in memcached and if no value
+exists in memcached, the generation of the value from the `Supplier<V>`
 
-
-ListenableFuture<String> val3 = cache.apply("key3", () -> {
-  try {
-     Thread.sleep(500);
-  } catch (InterruptedException e) {
-     e.printStackTrace();
-  }
-  return "key3";
-}, executorService);
-
-ListenableFuture<String> val4 = cache.apply("key1", () -> {
-  try {
-    Thread.sleep(500);
-  } catch (InterruptedException e) {
-    e.printStackTrace();
-  }
-  return "key_new";
-}, executorService);
-
-
-assertEquals("Value should be key1","key1",this.awaitForFutureOrElse(val, null));
-assertEquals("Value should be key2","key2",this.awaitForFutureOrElse(val2, null));
-assertEquals("Value should be key3","key3",this.awaitForFutureOrElse(val3, null));
-
-// Key1 will no longer be in the cache, only key2 and key3
-assertEquals("Value should be key1","key_new",this.awaitForFutureOrElse(val4, null));
-
-----
-
-'''
-
-=== ExpiringLastRecentlyUsedCache
-
-The difference between `SimpleLastRecentlyUsedCache` and `ExpiringLastRecentlyUsedCache` is that the later has a default
-time to live for the elements that are put in the cache, and also; if desired, a time to idle for the items.
-
-The `timeToLive` and `timeToIdle` are supplied to the constructor of the cache:
-
-'''
-
-===== Using Only Time to Live
-
-Example, of creating a cache for which the item will live for 1 minute, regardless of when they were last used:
-
-[source,java]
-----
-new ExpiringLastRecentlyUsedCache<>(10,60,0, TimeUnit.SECONDS));
-----
-
-'''
-
-===== Using Time to Live, and Time to Idle
-
-Example, of creating a cache for which the item will live for 1 minute, but have to be used within the last 30 SECONDS
-
-[source,java]
-----
-new ExpiringLastRecentlyUsedCache<>(10,60,30, TimeUnit.SECONDS));
-----
-
-'''
 
 === Waiting on futures
 
@@ -287,15 +219,10 @@ There are two implementations of the `CacheWithExpiry<V>` interface:
 The second implementation `ElastiCacheMemcachedCache<V>` is an extension of the `SpyMemcachedCache<V>` implementation
 for working with Amazon AWS's memcached support (known as http://aws.amazon.com/elasticache/[ElastiCache]).
 
-The `CacheWithExpiry<V>` contains the method:
+The `CacheWithExpiry<V>` interface differs from that of the `Cache<V>`, by having Duration element as part of the cache method.
+This allows you to specify the duration (length of time) that the item lives in the cache.
 
-[source,java]
-----
-public ListenableFuture<V> apply(String key, Supplier<V> computation, Duration timeToLive, ListeningExecutorService executorService);
-----
 
-The difference between this method and the `apply` that is available in the `Cache<V>` interface, is the addition of the
-Duration parameter.  Meaning that keys can have differing cache expiry times (memcached supports this).
 
 
 '''
@@ -313,7 +240,7 @@ The following defaults are for both memcached and ElastiCache memcached
 |=========================================================
 |Method         |Default | Description |
 |setTimeToLive     |  Duration.ofSeconds(60); | The default expiry time an item with be given if not specified |
-|setMaxCapacity    | 1000; | Max number of futures to internal cache whilst a value is being calculated |
+|setMaxCapacity    | 1000; | Max number of futures to internal cache whilst a value is being calculated.  This is NOT the max number of items cachable in memcached |
 |setMemcachedHosts | "localhost:11211"; | Comma separated host list |
 |setHashingType    | ConnectionFactoryBuilder.Locator.CONSISTENT; | Using consistent hashing, don't change |
 |setFailureMode    | FailureMode.Redistribute; | When an error occurs, what should occur (FailureMode.Retry may suit you better for this) |
@@ -325,19 +252,22 @@ The following defaults are for both memcached and ElastiCache memcached
 |dnsConnectionTimeout | Duration.ofSeconds(3); | When resolving the memcachedHosts to ip addresses, the amount of time to wait for dns lookup, before ignoring that node |
 |waitForMemcachedSet  | false | Wait for the write to memcached to occur before removing future from internal cache |
 |setWaitDuration | Duration.ofSeconds(2); | amount of time to wait for the memcached set |
-|keyHashType | KeyHashingType.JAVA_XXHASH; | how the cache key is hashed |
+|keyHashType | KeyHashingType.NATIVE_XXHASH; | how the cache key is hashed.  The key is not stored verbatim in memcache and is hash to a number first.  This is the hashing algorithm used. |
 |keyPrefix | Optional.empty() | should the key used in lookup, be prefixed with a string to avoid the unlikely event of a key claash. |
 |asciiOnlyKeys | false; | we only have ascii keys that will be stored in the cache |
 |hostStringParser | new CommaSeparatedHostAndPortStringParser(); | do not change |
 |hostResolver | new AddressByNameHostResolver(); | do not change|
-|useStaleCache | false; | whether stale caching is enabled |
+|useStaleCache | false; | Whether stale caching is enabled |
 |staleCacheAdditionalTimeToLive | Duration.ZERO; | The amount of time extra that items will be stored in the stale cached |
 |staleCachePrefix | "stale"; | The prefix for stale keys, to avoid clash |
-|staleMaxCapacity | -1; | The size of the cache for futures for the stae cache is the same as the `maxCapacity` if -1 |
+|staleMaxCapacity | -1; | The size of the cache for futures for the stale cache is the same as the `maxCapacity` if -1 |
 |staleCacheMemachedGetTimeout | Duration.ZERO | Time to wait for lookups against the stale cache |
 |removeFutureFromInternalCacheBeforeSettingValue | false; | When the `Supplier<V>` computation is completed the future is set with the computed value, and removed
-from the internal cache.  This is whether (false) set the future to complete, before removal for internal future cache.  Or (true), remove the future from
-map firts and then set the future value |
+from the internal cache.  This is whether (if false) specifies that we set the future to complete, before removal of the internal future cache.  Or (true), remove the future from
+map first and then set the future value |
+|metricRecorder | no metric recorder | Can take a new `YammerMetricsRecorder` that will record metrics in a CodeHale Metric Registry |
+|compressionAlgorithm | SNAPPY | The type of compression algorithm to use when values are stored in memcached. LZ4 is the quickest implementation |
+|herdProtectionEnabled| true | If you which to turn off herd cache protection |
 |=========================================================
 
 The following default apply just to that of ElastiCache memcached
@@ -353,9 +283,34 @@ The following default apply just to that of ElastiCache memcached
 | setDelayBeforeClientClose | Duration.ofSeconds(300); | When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created, and the old client is closed. There a delay before the old client is closed, as it may still be in use |
 | setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect | 3 | If the config host returns invalid config this number of times in a row, a reconnection will be made |
 | setUpdateConfigVersionOnDnsTimeout | true; |  Set to false, if you don't want to acknowledge a config update, if a dns resolution for any of the memcached nodes failed |
+| setMemcachedClientType | SPY | Default memcached client is that of SPY.  Folsom is available, but not fully tested, therefore do not change |
+| setUseFolsomStringClient | false | If we are just storing string.  Folsom specific (do not use) |
+| setFolsomCharset | UTF-8 | do not use |
+| setFolsomConnections | 10 | do not use |
+| setFolsomRequestTimeout 3000 | do not use |
+| setFolsomMaxOutstandingRequests | do not use |
 |=========================================================
 
 '''
+
+=== `Herd Protection`
+
+The `SpyMemcachedCache<V>` or `ElastiCacheMemcachedCache<V>`  thundering herd protection is made available by the use of
+an internal cache.  The `get` and `apply` methods make use of this internal cache.  It is this internal cache that has a finite size
+that is specified by `setMaxCapacity`.   When the get or apply methods are called, this cache is checked for an existing
+`ListenableFuture<V>`.  If one exists this means a previous execution of `get` or `apply` is running that is either fetching
+the value from memcached or is pending on the the `Supplier<V>` to generate the value.
+
+If an existing `ListenableFuture<V>` is available in the internal cache this is returned to the user.  If one does not
+exist a new `ListenableFuture<V>` will be create and returned.
+
+
+==== `Disable Herd Protection`
+
+It might be the case that you do not need the herd protection (you have a long tail where no one key is hot).
+And instead you want to use the Future, Supplier and Predicate functionality of herdcache, withou the 'herd'.
+This can be done, by setting `herdProtectionEnabled` to false.  This replaces the internal cache with a NoOp cache.
+
 
 === `SpyMemcachedCache`
 

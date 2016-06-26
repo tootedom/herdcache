@@ -35,7 +35,7 @@ public interface RevalidateInBackgroundCapableCache<V extends Serializable> exte
      * @param executorService The executor service in which to run the futures.
      * @param canCacheValueEvalutor Should the value returned by the #computation Supplier be cached or not
      * @param isCachedValueValid Should the value returned by the cache be returned or not (and therefore the supplier called).
-     * @param returnInvalidCachedItemWhileRevalidate
+     * @param returnInvalidCachedItemWhileRevalidate boolean to specific if a stale item is returned while fresh value is obtained in background.
      * @return
      */
     public ListenableFuture<V> apply(String key,
@@ -47,11 +47,11 @@ public interface RevalidateInBackgroundCapableCache<V extends Serializable> exte
 
 
     /**
-     * obtain a value from the cache.  The cached value is only used if the @link #isCachedValueValid predict returns
-     * return, or {@code #isCachedValueValid} is true.
-     *
-     * {@code #isCachedValueValid} Predicate evaluates the cached value, if it returns true, the cached value should be allowed,
-     * otherwise the {@code #computation} Supplier is called to provide the value.
+     * obtain a value from the cache.  The cached value will be returned if the @link #isCachedValueValid predict returns
+     * return, or {@code #isCachedValueValid} is true.  {@code #isCachedValueValid} Predicate evaluates the cached value,
+     * if it returns true, the cached value should be allowed, otherwise the {@code #computation} Supplier is called to
+     * provide the value.  At this point the supplier is either: called in the background, and the invalid item returned
+     * (i.e. stale cache item), or if the future return represents the suppliers refreshing of the value.
      *
      * The {@code #returnInvalidCachedItemWhileRevalidate} determines if the invalid cached object should be returned, whilst in
      * the background the @link #computation {@link java.util.function.Supplier} is executed to refresh the value
@@ -66,7 +66,7 @@ public interface RevalidateInBackgroundCapableCache<V extends Serializable> exte
      * @param executorService The executor service in which to run the futures.
      * @param canCacheValueEvalutor Should the value returned by the #computation Supplier be cached or not
      * @param isCachedValueValid Should the value returned by the cache be returned or not (and therefore the supplier called).
-     * @param returnInvalidCachedItemWhileRevalidate
+     * @param returnInvalidCachedItemWhileRevalidate boolean to specific if a stale item is returned while fresh value is obtained in background.
      * @return
      */
     public ListenableFuture<V> apply(String key,

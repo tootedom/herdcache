@@ -11,12 +11,12 @@
     </appender>
 
 
-    <logger name="net.spy" level="WARN"/>
-    <logger name="com.thimbleware.jmemcached" level="WARN"/>
-    <logger name="io.netty" level="WARN"/>
-    <logger name="org.greencheek.caching.herdcache.memcached.spy.extensions" level="WARN"/>
+    <logger name="net.spy" level="ERROR"/>
+    <logger name="com.thimbleware.jmemcached" level="ERROR"/>
+    <logger name="io.netty" level="ERROR"/>
+    <logger name="org.greencheek.caching.herdcache.memcached.spy.extensions" level="ERROR"/>
 
-    <root level="WARN">
+    <root level="ERROR">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
