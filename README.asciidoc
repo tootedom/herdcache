@@ -43,14 +43,14 @@ Each of the write methods, apply and set, allow the value to be calculated from 
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.26</version>
+  <version>1.0.40</version>
 </dependency>
 ----
 
 Please note that 0.1.0 is not backwards compatible with 1.0.1.  1.0.1 extends the Cache interface to include
 a couple of get methods.  Therefore, introduction a breaking change with the old api.
 
-== Cache Types
+= Cache Types
 
 There are currently two types of Cache interface. `Cache<V>` interface and the `CacheWithExpiry<V>` that extends upon the `Cache<V>`
 The two implementation's of the `CacheWithExpiry<V>`.
@@ -175,7 +175,7 @@ The `apply(...)` method returns a Future that wraps both the lookup for the cach
 exists in memcached, the generation of the value from the `Supplier<V>`
 
 
-=== Waiting on futures
+== Waiting on futures
 
 The `Cache<V>` interface inherits a Utility interface (`AwaitOnFuture<V>`) that gives you a couple of utility methods that allow you to wait
 on futures, for a value to be calculated
@@ -184,7 +184,7 @@ on futures, for a value to be calculated
 - `V awaitForFutureOrElse(ListenableFuture<V> future, V onExceptionValue, V onTimeoutValue, long duration, TimeUnit timeUnit)`
 
 
-==== Wait on future, with fallback value incase of exception
+=== Wait on future, with fallback value incase of exception
 
 A the value returned back from a cache apply is that of a `ListenableFuture`.  You can naturally wait on the currently
 executing thread (blocking that thread), for a value to be returned.  This is as follows:
@@ -227,7 +227,7 @@ This allows you to specify the duration (length of time) that the item lives in 
 
 '''
 
-=== Defaults
+= Defaults
 
 Both the following cache classes use the following defaults.
 
@@ -293,7 +293,7 @@ The following default apply just to that of ElastiCache memcached
 
 '''
 
-=== `Herd Protection`
+== `Herd Protection`
 
 The `SpyMemcachedCache<V>` or `ElastiCacheMemcachedCache<V>`  thundering herd protection is made available by the use of
 an internal cache.  The `get` and `apply` methods make use of this internal cache.  It is this internal cache that has a finite size
@@ -305,14 +305,14 @@ If an existing `ListenableFuture<V>` is available in the internal cache this is 
 exist a new `ListenableFuture<V>` will be create and returned.
 
 
-==== `Disable Herd Protection`
+== `Disable Herd Protection`
 
 It might be the case that you do not need the herd protection (you have a long tail where no one key is hot).
 And instead you want to use the Future, Supplier and Predicate functionality of herdcache, withou the 'herd'.
 This can be done, by setting `herdProtectionEnabled` to false.  This replaces the internal cache with a NoOp cache.
 
 
-=== `SpyMemcachedCache`
+= `SpyMemcachedCache`
 
 
 The `SpyMemcachedCache<V>` implementation uses the spy memcached java library to communicate with memcached.
@@ -360,7 +360,7 @@ The following show various ways of configuring the cache:
 
 '''
 
-==== Constructing the `SpyMemcachedCache`
+== Constructing the `SpyMemcachedCache`
 
 [source,java]
 ----
@@ -380,7 +380,7 @@ The following show various ways of configuring the cache:
 ----
 
 
-==== Specifying the Memcached hosts
+== Specifying the Memcached hosts
 
 By default the host string is `localhost:11211`, however, you can specify a number of hosts to connect to by specifying
 them as a comma separated string in the Builder:
@@ -412,7 +412,7 @@ By default 3 seconds, per host, is waited for to obtain the ip address.  This ca
 
 '''
 
-==== Specifying the Expiry of Items in memcached
+== Specifying the Expiry of Items in memcached
 
 There are two ways to specify the Expiry of items that are stored in memcached:
 
@@ -442,7 +442,7 @@ To specify the TTL on a per time basis, specify the Duration when calling the `a
 
 '''
 
-==== Setting Wait for memcached Set
+== Setting Wait for memcached Set
 
 When an item is not in the cache, or currently being calculated; the cache will execute the `Supplier<V>` computation,
 and store the returned value in memcached.   A future has been created and stored in the internal future calculation cache,
@@ -478,7 +478,7 @@ to occur.
 
 '''
 
-==== No Expiry
+== No Expiry
 
 Items in the cache can have no expiry TTL apply by specifying the duration as ZERO
 
@@ -501,7 +501,7 @@ Items in the cache can have no expiry TTL apply by specifying the duration as ZE
 
 '''
 
-==== Cache Key
+== Cache Key
 
 The cache key has to be a string. Memcached has a requirement for makeup of keys,
 when using the TEXT protocol, such that your key object must conform to the following requirements.
@@ -539,7 +539,7 @@ cache = new SpyMemcachedCache<>(
 
 '''
 
-==== Cache Key Prefix
+== Cache Key Prefix
 
 When hashing a key, there is a potential for two different Strings to actually end up with the same Hashed value.
 As a result you can add a cache prefix to the cache at construction.
@@ -567,7 +567,7 @@ has the potential to break the TEXT protocol key requirements (Hashing the key m
 
 '''
 
-====  Chosing Not To Cache
+==  Chosing Not To Cache
 
 
 Since 1.0.6 the client (`Cache<V>`) has the following method:
@@ -603,7 +603,7 @@ fallback and choose not to cache:
 
 '''
 
-====  Stale Caching
+==  Stale Caching
 
 
 Since 1.0.1 the client supports a stale caching mechanism; this by default is not
@@ -646,7 +646,7 @@ Stale Caching is available in both `SpyMemcachedCache` and `ElastiCacheMemcached
 
 '''
 
-==== Metrics
+== Metrics
 
 Metric are available in both `SpyMemcachedCache` and `ElastiCacheMemcachedCache`
 as of version `1.0.11`.  The configuration builder takes an option `.setMetricsRecorder(..)'
@@ -689,7 +689,7 @@ With the YammerMetricsRecorder the following metrics are placed inside the Metri
 
 
 
-=== `ElastiCacheMemcachedCache` (AWS ElastiCache Support)
+= `ElastiCacheMemcachedCache` (AWS ElastiCache Support)
 
 Since release 1.0.1 there has been support AWS's ElasticCache memcached cluster:
 
@@ -722,7 +722,7 @@ CacheWithExpiry<String> cache = new ElastiCacheMemcachedCache<String>(
 ----
 
 
-====  Setting ElastiCache Hosts
+==  Setting ElastiCache Hosts
 
 
 The ElastiCache cache works by using the auto discovery mechanism as described here, through that of a
@@ -765,7 +765,7 @@ one in each availability zone, but the cache will only connect to 1 availability
 
 '''
 
-==== Specifying the polling time
+== Specifying the polling time
 
 By default the ElastiCache cache polls the ElastiCache Configuration Endpoint for an update to the nodes that make up
 the cluster every 60 seconds. This can be configured via the following methods:
@@ -795,7 +795,7 @@ private static final CacheWithExpiry cache = new ElastiCacheMemcachedCache<Integ
 
 '''
 
-==== Persistent Connection to ElastiCache Configuration Endpoint
+== Persistent Connection to ElastiCache Configuration Endpoint
 
 The ElastiCache uses a persistent connection to the ElastiCache Configuration Endpoint. If the connection is lost,
 the client will automatically reconnect. The client will wait for a period (default 5 seconds) before reconnecting.
@@ -814,7 +814,7 @@ then the client will reconnect to the Configuration Endpoint. By default it take
 configurations before the client will reconnect. This is controlled by the method:
 `setNumberOfConsecutiveInvalidConfigurationsBeforeReconnect(int number)`
 
-==== Cluster nodes update and closing old SpyMemcached client
+== Cluster nodes update and closing old SpyMemcached client
 
 When the ElastiCache Configuration Endpoint, outputs a configuration update a new spy memcached client is created,
 and the old client is closed. There a delay before the old client is closed, as it may still be in use
@@ -822,13 +822,13 @@ and the old client is closed. There a delay before the old client is closed, as 
 following config builder method `.setDelayBeforeClientClose(Duration.ofSeconds(1))`
 
 
-==== ElastiCache Configuration Endpoint timeout
+== ElastiCache Configuration Endpoint timeout
 
 By default the client will wait for 3 seconds for a connection to the ElastiCache Configuration Endpoint.
 This can be changed by the following following config builder method `.setConnectionTimeoutInMillis(Duration.ofSeconds(2))`
 
 
-==== Host lookup
+== Host lookup
 
 When the ElastiCache Configuration Endpoint returns the configuration information it returns the hostname,
 and it may send with it the IP address.
@@ -863,7 +863,7 @@ The client will just be recreated.
 
 '''
 
-==== ElastiCache Configuration Url Endpoint update
+== ElastiCache Configuration Url Endpoint update
 
 
 This feature is available in `1.0.9` and above.
@@ -910,7 +910,7 @@ config endpoint.  You can reduce or increase this timeout.
 
 '''
 
-==== ElastiCache Chosing Not to use a Cached Value Predicate
+== ElastiCache Chosing Not to use a Cached Value Predicate
 
 
 This feature is available in `1.0.15` and above.
@@ -1035,10 +1035,10 @@ public class BackEndRequest extends HystrixCommand<Content> {
 
 '''
 
-==== User Supplied Expiry
+== User Supplied Expiry
 
 
-===== Do Not Cross The Streams
+=== Do Not Cross The Streams
 
 [quote, Egon Spengler, Ghostbusters]
 ----
@@ -1103,7 +1103,7 @@ In other words:
 
 '''
 
-==== Return Invalid Object Whilst Revalidate
+== Return Invalid Object Whilst Revalidate
 
 This is technically an alternate implementation of the stale-while-revalidate pattern.  This feature is available in
 herdcache version `1.0.26`, and is a implemented with in the interface `RevalidateInBackgroundCapableCache`.  This interface
@@ -1139,7 +1139,7 @@ while the `Supplier<V>` computation is submitted to the `executorService` in ord
 ''''
 
 
-==== Example Simple ElastiCache Test Class
+== Example Simple ElastiCache Test Class
 
 
 The below is a simple java main class the can be run on the command line like the following.  The below
@@ -1257,7 +1257,7 @@ public class ElastiCacheTest {
 
 '''
 
-=== Internal Notes
+= Internal Notes
 
 To compile and run perf tests do:
 
