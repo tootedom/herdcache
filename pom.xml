@@ -44,7 +44,7 @@
         <maven-assembly-plugin.version>2.4</maven-assembly-plugin.version>
         <maven-jar-plugin.version>2.4</maven-jar-plugin.version>
         <scala-maven-plugin.version>3.1.6</scala-maven-plugin.version>
-        <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>2.19.1</maven-surefire-plugin.version>
         <maven-release-plugin.version>2.3.2</maven-release-plugin.version>
         <maven-license-plugin.version>1.10.b1</maven-license-plugin.version>
         <maven-plugin-plugin.version>3.2</maven-plugin-plugin.version>
@@ -340,8 +340,7 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <reuseForks>true</reuseForks>
-                    <forkCount>2C</forkCount>
-                    <!--<parallel>classes</parallel>-->
+                    <forkCount>4C</forkCount>
                     <!--<useUnlimitedThreads>true</useUnlimitedThreads>-->
                     <!--
                     Sets the VM argument line used when unit tests are run.
