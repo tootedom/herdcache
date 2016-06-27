@@ -672,6 +672,7 @@ import java.util.function.Supplier;
         if(config.isUseStaleCache()) {
             staleStore.clear();
         }
+        backgroundRevalidationStore.clear();
     }
 
     public void clear() {

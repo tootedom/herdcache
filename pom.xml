@@ -340,13 +340,16 @@
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
                     <reuseForks>true</reuseForks>
-                    <forkCount>4C</forkCount>
+                    <forkCount>2C</forkCount>
                     <!--<useUnlimitedThreads>true</useUnlimitedThreads>-->
                     <!--
                     Sets the VM argument line used when unit tests are run.
                     Set by jacoco
                      -->
-                    <argLine>${surefireArgLine} -Dio.netty.leakDetectionLevel=paranoid -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SLF4JLogger -server -XX:+UnlockCommercialFeatures -XX:+FlightRecorder -XX:StartFlightRecording=settings=profile -XX:FlightRecorderOptions=defaultrecording=true,settings=profile,disk=true,repository=target/jfr,maxsize=1g,dumponexit=true,dumponexitpath=target/jfr</argLine>
+                    <!-- Add the following for JFR
+                     -XX:+UnlockCommercialFeatures -XX:+FlightRecorder -XX:StartFlightRecording=settings=profile -XX:FlightRecorderOptions=defaultrecording=true,settings=profile,disk=true,repository=target/jfr,maxsize=1g,dumponexit=true,dumponexitpath=target/jfr
+                     -->
+                    <argLine>${surefireArgLine} -Dio.netty.leakDetectionLevel=paranoid -Dnet.spy.log.LoggerImpl=net.spy.memcached.compat.log.SLF4JLogger -server</argLine>
                     <!-- Skips unit tests if the value of skip.unit.tests property is true -->
                     <skipTests>${skip.unit.tests}</skipTests>
                     <!-- Excludes integration tests when unit tests are run. -->
