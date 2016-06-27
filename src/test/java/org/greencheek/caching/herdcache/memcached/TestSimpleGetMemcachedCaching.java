@@ -173,7 +173,7 @@ public class TestSimpleGetMemcachedCaching {
     @Test
     public void testGetReturnsFromDisabledMemcachedCache() {
 
-        SpyMemcachedCache cache = new SpyMemcachedCache<>(
+        cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhosty:" + memcached.getPort())
                         .setTimeToLive(Duration.ofSeconds(2))
@@ -211,8 +211,6 @@ public class TestSimpleGetMemcachedCaching {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-        cache.shutdown();
 
     }
 

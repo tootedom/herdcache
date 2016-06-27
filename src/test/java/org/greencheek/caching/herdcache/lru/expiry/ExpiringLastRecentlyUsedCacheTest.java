@@ -271,37 +271,40 @@ public class ExpiringLastRecentlyUsedCacheTest implements AwaitOnFuture {
 
     private void testThreadedAccess(Cache<String> cache) {
         ExecutorService threadPool = Executors.newFixedThreadPool(10);
-        ConcurrentHashMap<String,ConcurrentLinkedQueue<ListenableFuture<String>>> futures = new ConcurrentHashMap<>();
-        for(int i = 0;i<50000;i++) {
-            final String val = randInt(0,1000);
+        try {
+            ConcurrentHashMap<String, ConcurrentLinkedQueue<ListenableFuture<String>>> futures = new ConcurrentHashMap<>();
+            for (int i = 0; i < 50000; i++) {
+                final String val = randInt(0, 1000);
 
-             threadPool.submit(() -> {
-                 ConcurrentLinkedQueue<ListenableFuture<String>> queuedFutures = new ConcurrentLinkedQueue<ListenableFuture<String>>();
-                 ListenableFuture<String> future = cache.apply(val, () -> {
-                     try {
-                         Thread.sleep(2);
-                     } catch (InterruptedException e) {
-                         e.printStackTrace();
-                     }
-                     return val;
-                 }, executorService);
+                threadPool.submit(() -> {
+                    ConcurrentLinkedQueue<ListenableFuture<String>> queuedFutures = new ConcurrentLinkedQueue<ListenableFuture<String>>();
+                    ListenableFuture<String> future = cache.apply(val, () -> {
+                        try {
+                            Thread.sleep(2);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        return val;
+                    }, executorService);
 
-                 queuedFutures.add(future);
-                 ConcurrentLinkedQueue<ListenableFuture<String>> prev = futures.putIfAbsent(val, queuedFutures);
-                 if(prev!=null) {
-                     prev.add(future);
-                 }
-             });
-        }
-
-        for(Map.Entry<String,ConcurrentLinkedQueue<ListenableFuture<String>>> entry : futures.entrySet()) {
-            String value = entry.getKey();
-            ConcurrentLinkedQueue<ListenableFuture<String>> queue = entry.getValue();
-            while(!queue.isEmpty()) {
-                assertEquals("Value should be " + value, value, this.awaitForFutureOrElse(queue.poll(), null));
+                    queuedFutures.add(future);
+                    ConcurrentLinkedQueue<ListenableFuture<String>> prev = futures.putIfAbsent(val, queuedFutures);
+                    if (prev != null) {
+                        prev.add(future);
+                    }
+                });
             }
-        }
 
+            for (Map.Entry<String, ConcurrentLinkedQueue<ListenableFuture<String>>> entry : futures.entrySet()) {
+                String value = entry.getKey();
+                ConcurrentLinkedQueue<ListenableFuture<String>> queue = entry.getValue();
+                while (!queue.isEmpty()) {
+                    assertEquals("Value should be " + value, value, this.awaitForFutureOrElse(queue.poll(), null));
+                }
+            }
+        } finally {
+            threadPool.shutdownNow();
+        }
 
     }
 

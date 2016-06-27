@@ -1091,32 +1091,34 @@ public class TestSimpleMemcachedCaching {
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .build();
 
-        ListenableFuture<String> val = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return largeCacheValueAsBytes;
-        }, executorService);
+        try {
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return largeCacheValueAsBytes;
+            }, executorService);
 
-        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "value2".getBytes();
-        }, executorService);
+            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2".getBytes();
+            }, executorService);
 
 
-        assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val2, null));
+            assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val2, null));
 
-        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-
-        reporter.report();
-        reporter.stop();
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
     }
 
 
@@ -1406,46 +1408,50 @@ public class TestSimpleMemcachedCaching {
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .build();
 
-        ListenableFuture<String> val = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "value1";
-        }, executorService);
+        try {
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value1";
+            }, executorService);
 
-        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "value2";
-        }, executorService);
-
-
-        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-
-        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-
-        Set<String> metricNames = registry.getNames();
-        assertTrue(metricNames.size() > 0);
-
-        assertTrue(metricNames.containsAll(new ArrayList(){{ add("distributed_cache_count");
-            add("distributed_cache_misscount");
-            add("distributed_cache_missrate");
-            add("distributed_cache_timer");
-            add("distributed_cache_writes_count");
-            add("value_calculation_cache_hitcount");
-            add("value_calculation_cache_hitrate");
-            add("value_calculation_success_count");
-            add("value_calculation_time_timer"); }}));
+            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2";
+            }, executorService);
 
 
-        reporter.report();
-        reporter.stop();
+            assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
+
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+            Set<String> metricNames = registry.getNames();
+            assertTrue(metricNames.size() > 0);
+
+            assertTrue(metricNames.containsAll(new ArrayList() {{
+                add("distributed_cache_count");
+                add("distributed_cache_misscount");
+                add("distributed_cache_missrate");
+                add("distributed_cache_timer");
+                add("distributed_cache_writes_count");
+                add("value_calculation_cache_hitcount");
+                add("value_calculation_cache_hitrate");
+                add("value_calculation_success_count");
+                add("value_calculation_time_timer");
+            }}));
+
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
     }
 
     @Test
@@ -1472,51 +1478,53 @@ public class TestSimpleMemcachedCaching {
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .build();
 
-        ListenableFuture<String> val = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "not_cacheable";
-        }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
+        try {
+            ListenableFuture<String> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "not_cacheable";
+            }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
 
 
-        assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val, null));
+            assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val, null));
 
-        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "someothervalue";
-        }, executorService, (x) -> false, cachedValueAllowed);
-
-
-        assertEquals("Value should be key1", "someothervalue", cache.awaitForFutureOrElse(val2, null));
-
-        ListenableFuture<String> val3 = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return "someothervalue";
-        }, executorService, org.greencheek.caching.herdcache.Cache.CAN_ALWAYS_CACHE_VALUE);
+            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "someothervalue";
+            }, executorService, (x) -> false, cachedValueAllowed);
 
 
-        assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val3, null));
+            assertEquals("Value should be key1", "someothervalue", cache.awaitForFutureOrElse(val2, null));
+
+            ListenableFuture<String> val3 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "someothervalue";
+            }, executorService, org.greencheek.caching.herdcache.Cache.CAN_ALWAYS_CACHE_VALUE);
 
 
-        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-
-        Set<String> metricNames = registry.getNames();
-        assertTrue(metricNames.size() > 0);
+            assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val3, null));
 
 
-        reporter.report();
-        reporter.stop();
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+            Set<String> metricNames = registry.getNames();
+            assertTrue(metricNames.size() > 0);
+
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
     }
 
     @Test
@@ -1544,42 +1552,45 @@ public class TestSimpleMemcachedCaching {
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .build();
 
-        ListenableFuture<Content> val = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return new Content("not_cacheable");
-        }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE,cachedValueAllowed);
+        try {
+            ListenableFuture<Content> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return new Content("not_cacheable");
+            }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
 
 
-        assertEquals("Value should be key1", "not_cacheable", ((Content)cache.awaitForFutureOrElse(val, null)).getContent());
+            assertEquals("Value should be key1", "not_cacheable", ((Content) cache.awaitForFutureOrElse(val, null)).getContent());
 
-        ListenableFuture<Content> val2 = cache.apply("Key1", () -> {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            return new Content("someothervalue");
-        }, executorService,(x) -> false,cachedValueAllowed);
-
-
-        assertEquals("Value should be key1", "someothervalue", ((Content)cache.awaitForFutureOrElse(val2, null)).getContent());
-
-        ListenableFuture<String> val3 = cache.get("Key1");
-        assertEquals("Value should be key1", "not_cacheable", ((Content)cache.awaitForFutureOrElse(val3, null)).getContent());
+            ListenableFuture<Content> val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return new Content("someothervalue");
+            }, executorService, (x) -> false, cachedValueAllowed);
 
 
-        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+            assertEquals("Value should be key1", "someothervalue", ((Content) cache.awaitForFutureOrElse(val2, null)).getContent());
 
-        Set<String> metricNames = registry.getNames();
-        assertTrue(metricNames.size() > 0);
+            ListenableFuture<String> val3 = cache.get("Key1");
+            assertEquals("Value should be key1", "not_cacheable", ((Content) cache.awaitForFutureOrElse(val3, null)).getContent());
 
 
-        reporter.report();
-        reporter.stop();
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+            Set<String> metricNames = registry.getNames();
+            assertTrue(metricNames.size() > 0);
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
+
+
     }
 
     @Test
