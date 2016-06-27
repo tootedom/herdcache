@@ -168,7 +168,7 @@ The list of available methods are:
 - `public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive)`
 - `public ListenableFuture<V> set(String keyString, V value, Duration timeToLive)`
 - `public ListenableFuture<V> set(String keyString, V value, Duration timeToLive, ListeningExecutorService executorService)`
-- `public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive, ListeningExecutorService executorService)
+- `public ListenableFuture<V> set(String keyString, Supplier<V> value, Duration timeToLive, ListeningExecutorService executorService)`
 
 
 The `apply(...)` method returns a Future that wraps both the lookup for the cache value in memcached and if no value
