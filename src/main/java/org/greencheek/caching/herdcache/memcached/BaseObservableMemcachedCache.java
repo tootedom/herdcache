@@ -412,6 +412,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                 // occurring
                 Single<CacheItem<V>> existingFuture = store.putIfAbsent(keyString, item);
                 if (existingFuture == null) {
+                    Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                     return item;
 
 //                Single<CacheItem<V>> single = Single.create( sub -> {
@@ -451,6 +452,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
 //                }
 
                 } else {
+                    Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                     return existingFuture;
                 }
             }

@@ -41,7 +41,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private Duration dnsConnectionTimeout = Duration.ofSeconds(3);
     private boolean waitForMemcachedSet  = false;
     private Duration setWaitDuration = Duration.ofSeconds(2);
-    private KeyHashingType keyHashType = KeyHashingType.NATIVE_XXHASH;
+    private KeyHashingType keyHashType = KeyHashingType.NONE;
     private Optional<String> keyPrefix = Optional.empty();
     private boolean asciiOnlyKeys = false;
     private HostStringParser hostStringParser = new CommaSeparatedHostAndPortStringParser();

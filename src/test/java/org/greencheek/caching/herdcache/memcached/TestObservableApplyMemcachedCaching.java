@@ -46,6 +46,7 @@ import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -531,62 +532,66 @@ public class TestObservableApplyMemcachedCaching {
         executorService.shutdownNow();
     }
 
-//    private void testHashAlgorithm(HashAlgorithm algo) {
-//        cache = new SpyMemcachedCache<String>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setHashAlgorithm(algo)
-//                        .setKeyPrefix(Optional.of("elastic"))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testJenkinsHashAlgorithm() {
-//        testHashAlgorithm(new JenkinsHash());
-//    }
-//
-//
-//    @Test
-//    public void testXXHashAlgorithm() {
-//        testHashAlgorithm(new XXHashAlogrithm());
-//    }
-//
-//    @Test
-//    public void testAsciiXXHashAlgorithm() {
-//        testHashAlgorithm(new AsciiXXHashAlogrithm());
-//    }
+    private void testHashAlgorithm(HashAlgorithm algo) {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setHashAlgorithm(algo)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration);
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        },duration);
+
+
+        assertEquals("Value should be key1", "value1", val.toBlocking().value().getValue().get());
+        assertEquals("Value should be key1", "value1", val2.toBlocking().value().getValue().get());
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+        assertEquals(1, memcached.getDaemon().getCache().getGetCmds());
+
+    }
 
     @Test
-    public void testMemcachedCache() {
+    public void testJenkinsHashAlgorithm() {
+        testHashAlgorithm(new JenkinsHash());
+    }
+
+
+    @Test
+    public void testXXHashAlgorithm() {
+        testHashAlgorithm(new XXHashAlogrithm());
+    }
+
+    @Test
+    public void testAsciiXXHashAlgorithm() {
+        testHashAlgorithm(new AsciiXXHashAlogrithm());
+    }
+
+    @Test
+    public void testApplyForSameKeySetsValueOnceInMemcached() {
 
         cache = new SpyObservableMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
@@ -666,552 +671,301 @@ public class TestObservableApplyMemcachedCaching {
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
         assertEquals(2, cacheApplyInvocations.get());
         assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
-
-
     }
 
-//    @Test
-//    public void testNoCacheKeyHashingMemcachedCache() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.NONE)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testDifferenceCachedItemTimes() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setSetWaitDuration(Duration.ofSeconds(3))
-//                        .setKeyHashType(KeyHashingType.NONE)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            return "value1";
-//        }, Duration.ofSeconds(3), executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key2", () -> {
-//            return "value2";
-//        }, Duration.ofSeconds(1), executorService);
-//
-//        try {
-//            Thread.sleep(2000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//
-//        ListenableFuture<String> val1_again = cache.apply("Key1", () -> {
-//            return "value1_again";
-//        }, Duration.ofSeconds(3), executorService);
-//
-//        ListenableFuture<String> val2_again = cache.apply("Key2", () -> {
-//            return "value2_again";
-//        }, Duration.ofSeconds(1), executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val1_again, null));
-//        assertEquals("Value should be key2", "value2_again", cache.awaitForFutureOrElse(val2_again, null));
-//
-//        assertEquals(2, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//
-//    @Test
-//    public void testMD5LowerKeyHashingMemcachedCache() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testMD5LowerKeyHashingMemcachedCacheWithCachePrefix() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                        .setKeyPrefix(Optional.of("bob"))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//    }
-//
-//    @Test
-//    public void testMD5LowerKeyHashingMemcachedCacheWithNoHashingOfCacheKeyPrefix() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                        .setKeyPrefix(Optional.of("bob"))
-//                        .setHashKeyPrefix(false)
-//                        .setAsciiOnlyKeys(true)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//    }
-//
-//    @Test
-//    public void testSHA256LowerKeyHashingMemcachedCache() {
-//        cache = new SpyMemcachedCache<String>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_LOWER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testCachePredicate() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_UPPER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService, (value) -> {
-//            return !value.equals("value1");
-//        });
-//
-//
-//        try {
-//            Thread.sleep(2000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//
-//        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value for key1 should be value1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value for key1 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//
-//        ListenableFuture<String> val3 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value3";
-//        }, executorService);
-//
-//        assertEquals("Value for key1 should be value2", "value2", cache.awaitForFutureOrElse(val3, null));
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testMD5UpperKeyHashingMemcachedCache() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_UPPER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    public static class Document implements Serializable {
-//        static final long serialVersionUID = 42L;
-//
-//        private final String title;
-//        private final String author;
-//        private final String content;
-//
-//        public Document(String title, String author, String content) {
-//            this.title = title;
-//            this.author = author;
-//            this.content = content;
-//        }
-//
-//        public boolean equals(Object o) {
-//            if (o instanceof Document) {
-//                Document other = (Document) o;
-//
-//                if (other.title.equals(this.title) &&
-//                        other.author.equals(this.author) &&
-//                        other.content.equals(this.content)) {
-//                    return true;
-//                } else {
-//                    return false;
-//                }
-//            } else {
-//                return false;
-//            }
-//        }
-//    }
-//
-//    @Test
-//    public void testSerializationInMemcachedCache() {
-//        cache = new SpyMemcachedCache<Document>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_UPPER)
-//                        .setSerializingTranscoder(new SerializingTranscoder())
-//                        .buildMemcachedConfig()
-//        );
-//
-//        Document nemo = new Document("Finding Nemo", "Disney", largeCacheValue);
-//        Document jungle = new Document("Jungle Book", "Disney", largeCacheValue);
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return nemo;
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return jungle;
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", nemo, cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", nemo, cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testFastSerializationInMemcachedCache() {
-//        cache = new SpyMemcachedCache<Document>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_UPPER)
-//                        .setSerializingTranscoder(new FastSerializingTranscoder())
-//                        .buildMemcachedConfig()
-//        );
-//
-//        Document nemo = new Document("Finding Nemo", "Disney", largeCacheValue);
-//        Document jungle = new Document("Jungle Book", "Disney", largeCacheValue);
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return nemo;
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return jungle;
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals("Value should be nemo object", nemo, cache.awaitForFutureOrElse(cache.get("Key1"), null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testLargeCacheByteValue() {
-//        MetricRegistry registry = new MetricRegistry();
-//
-//        byte[] largeCacheValueAsBytes = largeCacheValue.getBytes();
-//
-//        cache = new SpyMemcachedCache<byte[]>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                        .setSerializingTranscoder(new SerializingTranscoder(Integer.MAX_VALUE))
-//                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
-//                .convertRatesTo(TimeUnit.SECONDS)
-//                .convertDurationsTo(TimeUnit.MILLISECONDS)
-//                .build();
-//
-//        try {
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return largeCacheValueAsBytes;
-//            }, executorService);
-//
-//            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "value2".getBytes();
-//            }, executorService);
-//
-//
-//            assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val, null));
-//            assertEquals("Value should be key1", largeCacheValueAsBytes, cache.awaitForFutureOrElse(val2, null));
-//
-//            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//        } finally {
-//            reporter.report();
-//            reporter.stop();
-//        }
-//    }
-//
-//
-//    @Test
-//    public void testLargeCacheValue() {
-//
-//
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return largeCacheValue;
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", largeCacheValue, cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", largeCacheValue, cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
+    @Test
+    public void testSupplierValueIsNotCacheable() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration,(value) -> false);
+
+        assertEquals("Value should be key1", "value1", val.toBlocking().value().getValue().get());
+
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        },duration);
+
+
+
+        assertEquals("Value should be key1", "value2", val2.toBlocking().value().getValue().get());
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(2, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+    @Test
+    public void testCacheValueIsNotValid() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration,(value) -> true);
+
+        assertEquals("Value should be key1", "value1", val.toBlocking().value().getValue().get());
+
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        },duration,(value) -> true,(value)->false);
+
+
+        assertEquals("Value should be key1", "value2", val2.toBlocking().value().getValue().get());
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(2, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(2, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+
+    @Test
+    public void testNoHashingPerformedOnKey() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration,(value) -> true);
+
+
+        CacheItem<String> item = val.toBlocking().value();
+        assertTrue(item.getKey().startsWith("elastic"));
+        assertTrue(item.getKey().endsWith("Key1"));
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(1, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+    @Test
+    public void testItemExpiry() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(300))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },Duration.ofSeconds(1),(value) -> true);
+
+
+        CacheItem<String> item = val.toBlocking().value();
+        assertTrue(item.getKey().equals("Key1"));
+
+
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+
+        }
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value set again";
+        },Duration.ofSeconds(1),(value) -> true);
+
+
+        assertEquals("value set again",val2.toBlocking().value().getValue().get());
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(2, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(2, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+    public static class Document implements Serializable {
+        static final long serialVersionUID = 42L;
+
+        private final String title;
+        private final String author;
+        private final String content;
+
+        public Document(String title, String author, String content) {
+            this.title = title;
+            this.author = author;
+            this.content = content;
+        }
+
+        public boolean equals(Object o) {
+            if (o instanceof Document) {
+                Document other = (Document) o;
+
+                if (other.title.equals(this.title) &&
+                        other.author.equals(this.author) &&
+                        other.content.equals(this.content)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+    }
+
+    @Test
+    public void testSerializationInMemcachedCache() {
+        cache = new SpyObservableMemcachedCache<Document>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        Document nemo = new Document("Finding Nemo", "Disney", largeCacheValue);
+        Document jungle = new Document("Jungle Book", "Disney", largeCacheValue);
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return nemo;
+        }, Duration.ofSeconds(100));
+
+        assertEquals("Value should be key1", nemo, val.toBlocking().value().getValue().get());
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return jungle;
+        }, Duration.ofSeconds(100));
+
+
+        assertEquals("Value should be key1", nemo, val2.toBlocking().value().getValue().get());
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+    }
+//
+
+//
+    @Test
+    public void testLargeCacheValue() {
+
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return largeCacheValue;
+        }, Duration.ZERO);
+
+        assertEquals("Value should be key1", largeCacheValue, val.toBlocking().value().getValue().get());
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        }, Duration.ZERO);
+
+
+        assertEquals("Value should be same as key1", largeCacheValue, val2.toBlocking().value().getValue().get());
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+    }
 //
 //
 //    @Test
@@ -1266,384 +1020,183 @@ public class TestObservableApplyMemcachedCaching {
 //    }
 //
 //
-//    @Test(expected=UnableToSubmitSupplierForExecutionException.class)
-//    public void testRejectedExecutionThrowsException() throws Throwable {
-//
-//        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
-//                0L, TimeUnit.MILLISECONDS,
-//                new LinkedBlockingQueue<Runnable>(1)));
-//        try {
-//            cache = new SpyMemcachedCache<>(
-//                    new ElastiCacheCacheConfigBuilder()
-//                            .setMemcachedHosts("localhost:" + memcached.getPort())
-//                            .setTimeToLive(Duration.ofSeconds(60))
-//                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                            .setWaitForMemcachedSet(true)
-//                            .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                            .buildMemcachedConfig()
-//            );
-//
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return largeCacheValue;
-//            }, executorService);
-//
-//            ListenableFuture<String> val2 = cache.apply("Key2", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "value2";
-//            }, executorService);
-//
-//
-//            ListenableFuture<String> val3 = cache.apply("Key3", () -> "value3", executorService);
-//            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, cache.awaitForFutureOrElse(val, null));
-//            assertEquals("Value should for key2 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
-//            assertEquals("Value should for key3 should be null", null, val3.get());
-//        } catch (Exception e) {
-//            throw e.getCause();
-//        } finally {
-//            executorService.shutdownNow();
-//        }
-//    }
-//
-//
-//    public static class ApplicationException extends RuntimeException {
-//
-//    }
-//
-//    @Test(expected=ApplicationException.class)
-//    public void testApplicationExceptionIsPropagatedToCaller() throws Throwable {
-//        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
-//                0L, TimeUnit.MILLISECONDS,
-//                new LinkedBlockingQueue<Runnable>(1)));
-//        try {
-//            cache = new SpyMemcachedCache<>(
-//                    new ElastiCacheCacheConfigBuilder()
-//                            .setMemcachedHosts("localhost:" + memcached.getPort())
-//                            .setTimeToLive(Duration.ofSeconds(60))
-//                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                            .setWaitForMemcachedSet(true)
-//                            .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                            .buildMemcachedConfig()
-//            );
-//
-//            // Submit an item to the cache "Key1" is executing
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                throw new ApplicationException();
-//            }, executorService);
-//
-//            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, val.get());
-//        } catch (Exception e) {
-//            throw e.getCause();
-//        } finally {
-//            executorService.shutdownNow();
-//        }
-//    }
-//
-//    @Test(expected=UnableToScheduleCacheGetExecutionException.class)
-//    public void testRejectedExecutionInGetThrowsException() throws Throwable {
-//
-//        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
-//                0L, TimeUnit.MILLISECONDS,
-//                new LinkedBlockingQueue<Runnable>(1)));
-//        try {
-//            cache = new SpyMemcachedCache<>(
-//                    new ElastiCacheCacheConfigBuilder()
-//                            .setMemcachedHosts("localhost:" + memcached.getPort())
-//                            .setTimeToLive(Duration.ofSeconds(60))
-//                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                            .setWaitForMemcachedSet(true)
-//                            .setKeyHashType(KeyHashingType.MD5_LOWER)
-//                            .buildMemcachedConfig()
-//            );
-//
-//            // Submit an item to the cache "Key1" is executing
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return largeCacheValue;
-//            }, executorService);
-//
-//            // Submit an item to the cache "Key2" is queued
-//            ListenableFuture<String> val2 = cache.apply("Key2", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "value2";
-//            }, executorService);
-//
-//
-//            // Submit a GET, this will be rejected as Key1 is executing, the Key2 is filling the queue
-//            // The rejection is set on the ListenableFuture, so when you do to .get() it will throw an exception.
-//            ListenableFuture<String> val3 = cache.get("Key3", executorService);
-//
-//            assertEquals("Value should for key1 should be largeCacheValue", largeCacheValue, cache.awaitForFutureOrElse(val, null));
-//            assertEquals("Value should for key2 should be value2", "value2", cache.awaitForFutureOrElse(val2, null));
-//
-//            // Throws the excpetion
-//            assertEquals("Value should for key3 should be null", null, val3.get());
-//        } catch (Exception e) {
-//            throw e.getCause();
-//        } finally {
-//            executorService.shutdownNow();
-//        }
-//    }
-//
-//    @Test
-//    public void testSHA256UpperKeyHashingMemcachedCache() {
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        ListenableFuture<String> val = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value1";
-//        }, executorService);
-//
-//        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            return "value2";
-//        }, executorService);
-//
-//
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//    }
-//
-//    @Test
-//    public void testYammerMetricsRecording() {
-//        MetricRegistry registry = new MetricRegistry();
-//
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
-//                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
-//                .convertRatesTo(TimeUnit.SECONDS)
-//                .convertDurationsTo(TimeUnit.MILLISECONDS)
-//                .build();
-//
-//        try {
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "value1";
-//            }, executorService);
-//
-//            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "value2";
-//            }, executorService);
-//
-//
-//            assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
-//            assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
-//
-//            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//            Set<String> metricNames = registry.getNames();
-//            assertTrue(metricNames.size() > 0);
-//
-//            assertTrue(metricNames.containsAll(new ArrayList() {{
-//                add("distributed_cache_count");
-//                add("distributed_cache_misscount");
-//                add("distributed_cache_missrate");
-//                add("distributed_cache_timer");
-//                add("distributed_cache_writes_count");
-//                add("value_calculation_cache_hitcount");
-//                add("value_calculation_cache_hitrate");
-//                add("value_calculation_success_count");
-//                add("value_calculation_time_timer");
-//            }}));
-//
-//        } finally {
-//            reporter.report();
-//            reporter.stop();
-//        }
-//    }
-//
-//    @Test
-//    public void testDoNotUseCachedValue() {
-//        MetricRegistry registry = new MetricRegistry();
-//
-//        Predicate<String> cachedValueAllowed = (String value) -> {
-//            return value.equals("cacheable");
-//        };
-//
-//        cache = new SpyMemcachedCache<>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
-//                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
-//                .convertRatesTo(TimeUnit.SECONDS)
-//                .convertDurationsTo(TimeUnit.MILLISECONDS)
-//                .build();
-//
-//        try {
-//            ListenableFuture<String> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "not_cacheable";
-//            }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
-//
-//
-//            assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val, null));
-//
-//            ListenableFuture<String> val2 = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "someothervalue";
-//            }, executorService, (x) -> false, cachedValueAllowed);
-//
-//
-//            assertEquals("Value should be key1", "someothervalue", cache.awaitForFutureOrElse(val2, null));
-//
-//            ListenableFuture<String> val3 = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return "someothervalue";
-//            }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE);
-//
-//
-//            assertEquals("Value should be key1", "not_cacheable", cache.awaitForFutureOrElse(val3, null));
-//
-//
-//            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//            Set<String> metricNames = registry.getNames();
-//            assertTrue(metricNames.size() > 0);
-//
-//        } finally {
-//            reporter.report();
-//            reporter.stop();
-//        }
-//    }
-//
-//    @Test
-//    public void testDoNotUseSerialisedCachedValue() {
-//        MetricRegistry registry = new MetricRegistry();
-//
-//        Predicate<Content> cachedValueAllowed  = (Content value) ->
-//             value.getCreationDateEpoch() + System.currentTimeMillis() < 500;
-//
-//
-//
-//        cache = new SpyMemcachedCache<Content>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
-//                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
-//                        .buildMemcachedConfig()
-//        );
-//
-//        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
-//                .convertRatesTo(TimeUnit.SECONDS)
-//                .convertDurationsTo(TimeUnit.MILLISECONDS)
-//                .build();
-//
-//        try {
-//            ListenableFuture<Content> val = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return new Content("not_cacheable");
-//            }, executorService, Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
-//
-//
-//            assertEquals("Value should be key1", "not_cacheable", ((Content) cache.awaitForFutureOrElse(val, null)).getContent());
-//
-//            ListenableFuture<Content> val2 = cache.apply("Key1", () -> {
-//                try {
-//                    Thread.sleep(1000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//                return new Content("someothervalue");
-//            }, executorService, (x) -> false, cachedValueAllowed);
-//
-//
-//            assertEquals("Value should be key1", "someothervalue", ((Content) cache.awaitForFutureOrElse(val2, null)).getContent());
-//
-//            ListenableFuture<String> val3 = cache.get("Key1");
-//            assertEquals("Value should be key1", "not_cacheable", ((Content) cache.awaitForFutureOrElse(val3, null)).getContent());
-//
-//
-//            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-//
-//            Set<String> metricNames = registry.getNames();
-//            assertTrue(metricNames.size() > 0);
-//        } finally {
-//            reporter.report();
-//            reporter.stop();
-//        }
-//
-//
-//    }
-//
+
+//
+//
+    public static class ApplicationException extends RuntimeException {
+
+    }
+//
+    @Test(expected=ApplicationException.class)
+    public void testApplicationExceptionIsPropagatedToCaller() throws Throwable {
+        ListeningExecutorService executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(1)));
+        try {
+            cache = new SpyObservableMemcachedCache<>(
+                    new ElastiCacheCacheConfigBuilder()
+                            .setMemcachedHosts("localhost:" + memcached.getPort())
+                            .setTimeToLive(Duration.ofSeconds(60))
+                            .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                            .setWaitForMemcachedSet(true)
+                            .buildMemcachedConfig()
+            );
+
+            // Submit an item to the cache "Key1" is executing
+            Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+                throw new ApplicationException();
+            }, Duration.ZERO);
+
+            // will throw an error
+            CacheItem<String> item = val.toBlocking().value();
+            fail("expected exception to be raised");
+
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    public void testYammerMetricsRecording() {
+        MetricRegistry registry = new MetricRegistry();
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+                        .buildMemcachedConfig()
+        );
+
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+
+        try {
+            Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value1";
+            }, Duration.ofSeconds(2));
+
+
+            Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return "value2";
+            }, Duration.ofSeconds(2));
+
+
+            assertEquals("Value should be key1", "value1", val.toBlocking().value().getValue().get());
+            assertEquals("Value should be key1", "value1", val2.toBlocking().value().getValue().get());
+
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+            Set<String> metricNames = registry.getNames();
+            assertTrue(metricNames.size() > 0);
+
+            assertTrue(metricNames.containsAll(new ArrayList() {{
+                add("distributed_cache_count");
+                add("distributed_cache_misscount");
+                add("distributed_cache_missrate");
+                add("distributed_cache_timer");
+                add("distributed_cache_writes_count");
+                add("value_calculation_cache_hitcount");
+                add("value_calculation_cache_hitrate");
+                add("value_calculation_success_count");
+                add("value_calculation_time_timer");
+            }}));
+
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
+    }
+
+//
+    @Test
+    public void testDoNotUseSerialisedCachedValue() {
+        MetricRegistry registry = new MetricRegistry();
+
+        Predicate<Content> cachedValueAllowed  = (Content value) ->
+                System.currentTimeMillis() - value.getCreationDateEpoch() < 500;
+
+
+
+        cache = new SpyObservableMemcachedCache<Content>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setMetricsRecorder(new YammerMetricsRecorder(registry))
+                        .buildMemcachedConfig()
+        );
+
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(registry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+
+        try {
+            // this will cache the value
+            Single<CacheItem<Content>>  val = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return new Content("not_cacheable");
+            },Duration.ofSeconds(10), Cache.CAN_ALWAYS_CACHE_VALUE, cachedValueAllowed);
+
+
+            assertEquals("Value should be key1", "not_cacheable", val.toBlocking().value().getValue().get().getContent());
+
+            // wait for > 500 millis
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // This will not cache
+            Single<CacheItem<Content>>  val2 = cache.apply("Key1", () -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return new Content("someothervalue");
+            }, Duration.ofSeconds(10), (x) -> false, cachedValueAllowed);
+
+
+            assertEquals("Value should be key1", "someothervalue", val2.toBlocking().value().getValue().get().getContent());
+
+            Single<CacheItem<Content>> val3 = cache.get("Key1");
+            assertEquals("Value should be key1", "not_cacheable",val3.toBlocking().value().getValue().get().getContent());
+
+
+            assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+            Set<String> metricNames = registry.getNames();
+            assertTrue(metricNames.size() > 0);
+        } finally {
+            reporter.report();
+            reporter.stop();
+        }
+    }
+
 //    @Test
 //    public void testDoNotUseSerialisedCachedValueAndHystrix() {
 //
