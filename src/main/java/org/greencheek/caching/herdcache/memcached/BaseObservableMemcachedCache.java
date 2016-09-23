@@ -1,18 +1,11 @@
 package org.greencheek.caching.herdcache.memcached;
 
-//import com.github.benmanes.caffeine.cache.Caffeine;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
-import org.greencheek.caching.herdcache.callables.GetFromDistributedCache;
 import org.greencheek.caching.herdcache.domain.CacheItem;
-import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
-import org.greencheek.caching.herdcache.lru.CacheRequestFutureComputationCompleteNotifier;
-import org.greencheek.caching.herdcache.lru.CacheValueComputationFailureHandler;
 import org.greencheek.caching.herdcache.memcached.config.ElastiCacheCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.factory.*;
@@ -22,16 +15,12 @@ import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnec
 import org.greencheek.caching.herdcache.memcached.util.CacheMetricStrings;
 import org.greencheek.caching.herdcache.util.CacheKeyCreatorFactory;
 import org.greencheek.caching.herdcache.util.DurationToSeconds;
-import org.greencheek.caching.herdcache.util.StaleCacheKeyCreator;
 import org.greencheek.caching.herdcache.util.SubscriptionCompleter;
-import org.greencheek.caching.herdcache.util.futures.DoNothingSettableFuture;
 import org.greencheek.caching.herdcache.util.futures.GuavaSettableFuture;
 import org.greencheek.caching.herdcache.util.futures.SettableFuture;
 import org.greencheek.caching.herdcache.util.keycreators.CacheKeyCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rx.Observable;
-import rx.Scheduler;
 import rx.Single;
 import rx.SingleSubscriber;
 import rx.schedulers.Schedulers;
@@ -65,35 +54,23 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
 
 
     private final CacheWrite cacheWriter;
-    private final CacheWrite staleCacheWriter;
     private final CacheRead<V> cacheReader;
     private static final Logger logger  = LoggerFactory.getLogger(BaseObservableMemcachedCache.class);
 
-    private final SettableFuture<V> DUMMY_FUTURE_NOT_TO_RETURN = new DoNothingSettableFuture<>();
-
-    private final ConcurrentMap<String,Single<CacheItem<V>>> DO_NOTHING_MAP =  new ConcurrentLinkedHashMap.Builder()
-            .initialCapacity(0)
-            .maximumWeightedCapacity(0)
-            .build();
 
     private final MemcachedCacheConfig config;
     private final MemcachedClientFactory clientFactory;
     private final ConcurrentMap<String,Single<CacheItem<V>>> store;
-    private final int staleMaxCapacityValue;
-    private final Duration staleCacheAdditionalTimeToLiveValue;
 
 
 
     private final long memcachedGetTimeoutInMillis;
-    private final long staleCacheMemachedGetTimeoutInMillis;
 
-    private final CacheValueComputationFailureHandler failureHandler;
 
     private final MetricRecorder metricRecorder;
     private final CacheKeyCreator cacheKeyCreator;
     private final long millisToWaitForDelete;
     private final boolean waitForMemcachedSet;
-    private final long millisToWaitForMemcachedSet;
 
 
 
@@ -108,31 +85,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
 
         this.store = createInternalCache(config.isHerdProtectionEnabled(),maxCapacity,maxCapacity);
 
-
-        int staleCapacity = config.getStaleMaxCapacity();
-        if(staleCapacity<=0) {
-            staleMaxCapacityValue = maxCapacity;
-        } else {
-            staleMaxCapacityValue = staleCapacity;
-        }
-
-        Duration staleDuration = config.getStaleCacheAdditionalTimeToLive();
-        if(staleDuration.compareTo(Duration.ZERO)<=0) {
-            staleCacheAdditionalTimeToLiveValue = config.getTimeToLive();
-        } else {
-            staleCacheAdditionalTimeToLiveValue = staleDuration;
-        }
-
-
         memcachedGetTimeoutInMillis = config.getMemcachedGetTimeout().toMillis();
-
-        if(config.getStaleCacheMemachedGetTimeout().compareTo(Duration.ZERO) <=0) {
-            staleCacheMemachedGetTimeoutInMillis = memcachedGetTimeoutInMillis;
-        } else {
-            staleCacheMemachedGetTimeoutInMillis = config.getStaleCacheMemachedGetTimeout().toMillis();
-        }
-
-        failureHandler = (String key, Throwable t) -> { store.remove(key); };
 
         metricRecorder = config.getMetricsRecorder();
 
@@ -140,12 +93,9 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
 
         cacheWriter = new WaitForCacheWrite(metricRecorder,config.getSetWaitDuration().toMillis());
 
-        staleCacheWriter = new NoWaitForCacheWrite(metricRecorder);
-
         millisToWaitForDelete = config.getWaitForRemove().toMillis();
 
         waitForMemcachedSet = config.isWaitForMemcachedSet();
-        millisToWaitForMemcachedSet = config.getSetWaitDuration().toMillis();
     }
 
     private ConcurrentMap createInternalCache(boolean createCache,
@@ -156,11 +106,6 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                     .initialCapacity(initialCapacity)
                     .maximumWeightedCapacity(maxCapacity)
                     .build();
-//                (ConcurrentMap)Caffeine.newBuilder()
-//                .maximumSize(maxCapacity)
-//                .initialCapacity(maxCapacity)
-//                .build()
-//                .asMap();
         } else {
             return new NoOpConcurrentMap();
         }
@@ -201,14 +146,8 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
             }
         }).toObservable().cacheWithInitialCapacity(1).toSingle();
 
-        Single<CacheItem<V>> previousFuture = store.putIfAbsent(key, single);
-
-        if(previousFuture==null) {
-            return single;
-        } else {
-            Cache.logCacheHit(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
-            return previousFuture;
-        }
+        Cache.logCacheMiss(metricRecorder, key, CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED);
+        return single;
     }
 
     private V getFromDistributedCache(final ReferencedClient client,
@@ -244,15 +183,8 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
         final ReferencedClient client = clientFactory.getClient();
         if(!client.isAvailable()) {
             warnCacheDisabled();
-
-            Single<CacheItem<V>> previousFuture = store.get(keyString);
-            if(previousFuture==null) {
-                Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED);
-                return Single.just(new CacheItem<V>(keyString,null,false));
-            } else {
-                Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
-                return previousFuture;
-            }
+            Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_CACHE_DISABLED);
+            return Single.just(new CacheItem<V>(keyString,null,false));
         } else {
             Single<CacheItem<V>> future = store.get(keyString);
             if(future==null) {
@@ -340,72 +272,12 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                             // write with normal semantics
                             logger.debug("set requested for {}", keyString);
                             Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-                            SupplierStatus<V> value = callSupplier(computation, keyString, singleSubscriber, store);
+                            SupplierStatus<V> value = callSupplier(computation);
 
-                            if(value.isError()) {
-                                notifySubscriberOnError(keyString,value.getThrowable(),singleSubscriber,store);
-                            } else {
-                                // Set the item in the cache
-                                V results = value.getValue();
-                                final Scheduler schedulerForCacehWrite;
-                                if(waitForMemcachedSet) {
-                                    schedulerForCacehWrite = Schedulers.immediate();
-                                } else {
-                                    schedulerForCacehWrite = config.getWaitForMemcachedSetRxScheduler();
-                                }
-
-                                CacheItem<V> cacheItem = new CacheItem<V>(keyString,results,false);
-                                Single<CacheItem<V>> write = writeToCache(client, cacheItem, keyString,
-                                        DurationToSeconds.getSeconds(timeToLive),
-                                        isSupplierValueCachable);
-                                write.subscribeOn(schedulerForCacehWrite).subscribe();
-                                notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
-                            }
+                            notifySubscriberAndWriteToCache(client,keyString,value,singleSubscriber,isSupplierValueCachable,timeToLive);
                         }
                     }
                 }).toObservable().cacheWithInitialCapacity(1).toSingle();
-
-
-                //
-
-
-
-//                item = observableItem.toSingle();
-
-
-                //boolean wait = false;
-
-
-//                Observable<String> obs;
-//                if(!wait) {
-//                    Observable<String> writeValue = s2.toObservable();
-//                    Observable<String> withValue = writeValue.filter(value -> value != null);
-//                    obs = withValue.doOnNext(value -> set(value).subscribeOn(Schedulers.newThread()).subscribe());
-//
-////            withValue.subscribe(value -> set(value).subscribeOn(Schedulers.io()).subscribe());
-//                }
-//                else {
-//                    Observable<String> writeValue = s2.toObservable();
-//                    Observable<String> withValue = writeValue.filter(value -> value != null);
-//                    obs = withValue.doOnNext(value -> set(value).subscribeOn(Schedulers.immediate()).subscribe());
-//
-////            obs = withValue.flatMap(value -> set(value));
-////            obs = withValue.observeOn(Schedulers.io());
-//                }
-
-
-//                boolean isNotNullResults = (results != null);
-//                boolean isCacheable = canCacheValue.test(results);
-//                if (isNotNullResults & isCacheable) {
-//                    // write the cache entry
-//                    cacheWriter.writeToDistributedCache(client,
-//                            key,
-//                            results,
-//                            DurationToSeconds.getSeconds(itemExpiry));
-//                } else {
-//                    logger.debug("Cache Value cannot be cached.  It has to be either not null:({}), or cachable as determine by predicate:({}). " +
-//                            "Therefore, not storing in memcached",isNotNullResults,isCacheable);
-//                }
 
                 // create and store a new future for the to be generated value
                 // first checking against local a cache to see if the computation is already
@@ -414,43 +286,6 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                 if (existingFuture == null) {
                     Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                     return item;
-
-//                Single<CacheItem<V>> single = Single.create( sub -> {
-//                    Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
-//                    // check memcached.
-//
-//                    V cachedObject = cacheReader.getFromDistributedCache(client,
-//                            keyString,
-//                            memcachedGetTimeoutInMillis,
-//                            CacheMetricStrings.CACHE_TYPE_DISTRIBUTED_CACHE,
-//                            metricRecorder);
-//
-//                    boolean cachedObjectFoundInCache = cachedObject != null;
-//                    boolean validCachedObject = (cachedObjectFoundInCache && isCachedValueValid.test(cachedObject));
-//
-//                    if (validCachedObject) {
-//                        Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-//
-//                        SubscriptionCompleter.completeWithValue(sub, keyString, cachedObject, store,true,
-//                                config.isRemoveFutureFromInternalCacheBeforeSettingValue());
-//
-//                    } else {
-//                        // write with normal semantics
-//                        logger.debug("set requested for {}", keyString);
-//                        Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-//                        Throwable exceptionDuringWrite = callSupplier(client, computation,
-//                                keyString, timeToLive, executorService,
-//                                canCacheValueEvalutor, promise, store);
-//
-//                        if (exceptionDuringWrite != null) {
-//                            FutureCompleter.completeWithException(promise, keyString, exceptionDuringWrite, store,
-//                                    config.isRemoveFutureFromInternalCacheBeforeSettingValue());
-//                        }
-//                    }
-//
-//                    return promise;
-//                }
-
                 } else {
                     Cache.logCacheHit(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_VALUE_CALCULATION);
                     return existingFuture;
@@ -459,6 +294,37 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
         }
     }
 
+    private void notifySubscriberAndWriteToCache(ReferencedClient client,
+                                                 String keyString,
+                                                 SupplierStatus<V> value,
+                                                 SingleSubscriber<? super CacheItem<V>> singleSubscriber,
+                                                 Predicate<V> canCacheValueEvalutor,
+                                                 Duration timeToLive)
+    {
+        if(value.isError()) {
+            notifySubscriberOnError(keyString,value.getThrowable(),singleSubscriber,store);
+        } else {
+            // Set the item in the cache
+            V results = value.getValue();
+            CacheItem<V> cacheItem = new CacheItem<>(keyString,results,false);
+
+            if(waitForMemcachedSet) {
+                Single<CacheItem<V>> write = writeToCache(client, cacheItem, keyString,
+                        DurationToSeconds.getSeconds(timeToLive),
+                        canCacheValueEvalutor);
+                write.subscribeOn(Schedulers.immediate()).subscribe();
+
+                notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
+            } else {
+                notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
+
+                Single<CacheItem<V>> write = writeToCache(client, cacheItem, keyString,
+                        DurationToSeconds.getSeconds(timeToLive),
+                        canCacheValueEvalutor);
+                write.subscribeOn(config.getWaitForMemcachedSetRxScheduler()).subscribe();
+            }
+        }
+    }
 
     @Override
     public Single<CacheItem<V>> set(String key, Supplier<V> computation,Duration timeToLive,
@@ -480,27 +346,15 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                     final SettableFuture<V> promise = new GuavaSettableFuture<>();
                     logger.debug("set requested for {}", keyString);
                     Cache.logCacheMiss(metricRecorder, keyString, CacheMetricStrings.CACHE_TYPE_ALL);
-                    callSupplier(computation,keyString, singleSubscriber, DO_NOTHING_MAP);
 
+                    SupplierStatus<V> value = callSupplier(computation);
+
+                    notifySubscriberAndWriteToCache(client,keyString,value,singleSubscriber,canCacheValueEvalutor,timeToLive);
                 }
 
-            });
+            }).toObservable().cacheWithInitialCapacity(1).toSingle();
 
-            // make it so that the value is cached.
-            Observable<CacheItem<V>> observableItem = item.toObservable().cacheWithInitialCapacity(1);
-
-            //
-            observableItem = observableItem.doOnNext(value -> {
-                Single<CacheItem<V>> write = writeToCache(client,
-                        value,
-                        keyString,
-                        DurationToSeconds.getSeconds(timeToLive),
-                        canCacheValueEvalutor);
-                write.subscribeOn(Schedulers.immediate()).subscribe();
-            });
-
-
-            return observableItem.toSingle();
+           return item;
         }
 
     }
@@ -516,15 +370,9 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
      * write to memcached when the future completes, the generated value,
      * against the given key, with the specified expiry
      * @param computation  The future that will generate the value
-     * @param key The key against which to store an item
-     * @return true if the computation has been successfully submitted to the executorService for
-     *              obtaining of the value from the {@code computation}.  false if the computation could not be
-     *              scheduled for computation
+     * @return SupplierStatus This will contain the throwable or the suppliers computed value.
      */
-    private SupplierStatus<V> callSupplier(final Supplier<V> computation,
-                              final String key,
-                              final SingleSubscriber<? super CacheItem<V>> subscriber,
-                              final ConcurrentMap<String, Single<CacheItem<V>>> cachedFutureStore)
+    private SupplierStatus<V> callSupplier(final Supplier<V> computation)
     {
         final long startNanos =  System.nanoTime();
         V results = null;
@@ -565,21 +413,6 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                                                     config.isRemoveFutureFromInternalCacheBeforeSettingValue());
 
     }
-
-    private void writeToDistributedStaleCache(ReferencedClient client,String key,Duration ttl,
-                                   V valueToWriteToCache) {
-        if (config.isUseStaleCache()) {
-            String staleCacheKey = StaleCacheKeyCreator.createKey(config,key);
-            Duration staleCacheExpiry = ttl.plus(staleCacheAdditionalTimeToLiveValue);
-            // overwrite the stale cache entry
-            staleCacheWriter.writeToDistributedCache(client,
-                    staleCacheKey,
-                    valueToWriteToCache,
-                    DurationToSeconds.getSeconds(staleCacheExpiry));
-
-        }
-    }
-
 
     @Override
     public void shutdown() {

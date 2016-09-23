@@ -25,9 +25,7 @@ import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.Fas
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.SerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
-import org.greencheek.caching.herdcache.util.BackEndRequest;
-import org.greencheek.caching.herdcache.util.Content;
-import org.greencheek.caching.herdcache.util.RestClient;
+import org.greencheek.caching.herdcache.util.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,9 +42,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Created by dominictootell on 25/08/2014.
@@ -603,7 +599,7 @@ public class TestObservableApplyMemcachedCaching {
         );
 
         CountDownLatch latch = new CountDownLatch(2);
-        AtomicInteger cacheApplyInvocations = new AtomicInteger(0);
+        AtomicInteger cacheFetchValueInvocations = new AtomicInteger(0);
 
         Single<CacheItem<String>> val = cache.apply("Key1", () -> {
             try {
@@ -611,7 +607,7 @@ public class TestObservableApplyMemcachedCaching {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            cacheApplyInvocations.incrementAndGet();
+            cacheFetchValueInvocations.incrementAndGet();
             return "value1";
         },Duration.ZERO);
 
@@ -628,7 +624,6 @@ public class TestObservableApplyMemcachedCaching {
             } finally {
                 latch.countDown();
             }
-            cacheApplyInvocations.incrementAndGet();
 
         });
 
@@ -644,11 +639,12 @@ public class TestObservableApplyMemcachedCaching {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            cacheApplyInvocations.incrementAndGet();
+            cacheFetchValueInvocations.incrementAndGet();
             return "value2";
         }, Duration.ZERO);
 
 
+        assertSame(val,val2);
         System.out.println(val);
         System.out.println(val2);
 
@@ -669,8 +665,92 @@ public class TestObservableApplyMemcachedCaching {
         }
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
-        assertEquals(2, cacheApplyInvocations.get());
+        assertEquals(1, cacheFetchValueInvocations.get());
         assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+    }
+
+
+    @Test
+    public void testApplyForSameKeySetsValueTwiceInMemcachedAsHerdProtectionDisabled() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .disableHerdProtection()
+                        .buildMemcachedConfig()
+        );
+
+        CountDownLatch latch = new CountDownLatch(2);
+        AtomicInteger cacheFetchValueInvocations = new AtomicInteger(0);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            cacheFetchValueInvocations.incrementAndGet();
+            return "value1";
+        },Duration.ZERO);
+
+
+        System.out.println(Thread.currentThread().getName());
+        val.subscribeOn(Schedulers.io())
+                .observeOn(Schedulers.immediate())
+                .subscribe(value -> {
+                    System.out.println("sub1: " + Thread.currentThread().getName());
+
+                    try {
+                        assertEquals("Value should be key1", "value1", value.getValue().get());
+                    } finally {
+                        latch.countDown();
+                    }
+
+                });
+
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        Single<CacheItem<String>> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            cacheFetchValueInvocations.incrementAndGet();
+            return "value2";
+        }, Duration.ZERO);
+
+
+        assertNotSame(val,val2);
+        System.out.println(val);
+        System.out.println(val2);
+
+        val2.observeOn(Schedulers.immediate());
+        val2.subscribe(value -> {
+            System.out.println("sub2: " + Thread.currentThread().getName());
+            try {
+                assertEquals("Value should be key1", "value2", value.getValue().get());
+            } finally {
+                latch.countDown();
+            }
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        assertEquals(2, cacheFetchValueInvocations.get());
+        assertEquals(2, memcached.getDaemon().getCache().getSetCmds());
     }
 
     @Test
@@ -794,6 +874,112 @@ public class TestObservableApplyMemcachedCaching {
         CacheItem<String> item = val.toBlocking().value();
         assertTrue(item.getKey().startsWith("elastic"));
         assertTrue(item.getKey().endsWith("Key1"));
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(1, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+    @Test
+    public void testWaitForCacheSet() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        AtomicInteger canSaveCacheValue = new AtomicInteger(0);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration,(value) -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            canSaveCacheValue.incrementAndGet();
+            return true;
+        },(value) -> true);
+
+
+        CacheItem<String> item = val.toBlocking().value();
+        assertEquals(1,canSaveCacheValue.get());
+
+        assertTrue(item.getKey().startsWith("elastic"));
+        assertTrue(item.getKey().endsWith("Key1"));
+
+        // we override the same key
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        // first item is not cacheable, so we do not save it
+        assertEquals(1, memcached.getDaemon().getCache().getSetCmds());
+        // two gets on the cache which are misses
+        assertEquals(1, memcached.getDaemon().getCache().getGetCmds());
+    }
+
+
+    @Test
+    public void testNoWaitingForCacheSet() {
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(false)
+                        .setWaitForMemcachedSetRxScheduler(Schedulers.io())
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+        );
+
+        Duration duration = Duration.ofSeconds(60);
+
+        AtomicInteger canSaveCacheValue = new AtomicInteger(0);
+
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        },duration,(value) -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            canSaveCacheValue.incrementAndGet();
+            return true;
+        },(value) -> true);
+
+
+        CacheItem<String> item = val.toBlocking().value();
+        assertEquals(0,canSaveCacheValue.get());
+
+        assertTrue(item.getKey().startsWith("elastic"));
+        assertTrue(item.getKey().endsWith("Key1"));
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        assertEquals(1,canSaveCacheValue.get());
+
 
         // we override the same key
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
@@ -1126,7 +1312,7 @@ public class TestObservableApplyMemcachedCaching {
 
 //
     @Test
-    public void testDoNotUseSerialisedCachedValue() {
+    public void testDoNotUseCachedSerialisedContent() {
         MetricRegistry registry = new MetricRegistry();
 
         Predicate<Content> cachedValueAllowed  = (Content value) ->
@@ -1197,59 +1383,131 @@ public class TestObservableApplyMemcachedCaching {
         }
     }
 
-//    @Test
-//    public void testDoNotUseSerialisedCachedValueAndHystrix() {
-//
-//        cache = new SpyMemcachedCache<Content>(
-//                new ElastiCacheCacheConfigBuilder()
-//                        .setMemcachedHosts("localhost:" + memcached.getPort())
-//                        .setTimeToLive(Duration.ofSeconds(60))
-//                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-//                        .setWaitForMemcachedSet(true)
-//                        .setKeyHashType(KeyHashingType.SHA256_UPPER)
-//                        .buildMemcachedConfig()
-//        );
-//
-//        RestClient timeoutClient = new RestClient() {
-//            @Override
-//            public Content get(String key) {
-//                try {
-//                    Thread.sleep(20000);
-//                    return new Content("content");
-//                } catch (InterruptedException e) {
-//                    throw new RuntimeException();
-//                }
-//            }
-//
-//            public String toString() {
-//                return "timeoutClient";
-//            }
-//        };
-//
-//        RestClient baseClient = new RestClient() {
-//            @Override
-//            public Content get(String key) {
-//                return new Content("content_from_client");
-//            }
-//
-//            public String toString() {
-//                return "baseClient";
-//            }
-//        };
-//
-//
-//        assertEquals("content_from_client", new BackEndRequest("World",baseClient,cache).execute().getContent());
-//
-//        try {
-//            Thread.sleep(1000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//
-//        HystrixCommand<Content> content = new BackEndRequest("World",timeoutClient,cache);
-//
-//        assertEquals("content_from_client", content.execute().getContent());
-//
-//        assertTrue(content.isResponseFromFallback());
-//    }
+    @Test
+    public void testResponseFromHystrixFallbackIsReturned() {
+
+        cache = new SpyObservableMemcachedCache<Content>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        RestClient timeoutClient = new RestClient() {
+            @Override
+            public Content get(String key) {
+                try {
+                    Thread.sleep(20000);
+                    return new Content("content");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException();
+                }
+            }
+
+            public String toString() {
+                return "timeoutClient";
+            }
+        };
+
+        RestClient baseClient = new RestClient() {
+            @Override
+            public Content get(String key) {
+                return new Content("content_from_client");
+            }
+
+            public String toString() {
+                return "baseClient";
+            }
+        };
+
+
+        assertEquals("content_from_client", new ObservableBackEndRequest("World",baseClient,cache).execute().getContent());
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        HystrixCommand<Content> content = new ObservableBackEndRequest("World",timeoutClient,cache);
+
+        assertEquals("content_from_client", content.execute().getContent());
+
+        assertTrue(content.isResponseFromFallback());
+    }
+
+
+    @Test
+    public void testResponseFromHystrixFallbackIsNotCached() {
+
+        cache = new SpyObservableMemcachedCache<Content>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        RestClient timeoutClient = new RestClient() {
+            @Override
+            public Content get(String key) {
+                try {
+                    Thread.sleep(20000);
+                    return new Content("content");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException();
+                }
+            }
+
+            public String toString() {
+                return "timeoutClient";
+            }
+        };
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        String key = "World";
+        final HystrixCommand<Content> content = new FailingBackEndRequest(key,timeoutClient);
+
+        Single<CacheItem<Content>> item = cache.apply(key,
+                                                      () -> content.execute(),
+                                                      Duration.ofSeconds(60),
+                                                      (value) -> !content.isResponseFromFallback());
+
+        item.observeOn(Schedulers.io());
+        item.subscribeOn(Schedulers.io());
+
+        assertSame(FailingBackEndRequest.FALLBACK, item.toBlocking().value().value());
+
+        assertTrue(content.isResponseFromFallback());
+
+        assertNull(((Single<CacheItem<Content>>)cache.get(key)).toBlocking().value().value());
+
+        final HystrixCommand<Content> content2 = new FailingBackEndRequest(key,timeoutClient);
+
+
+        item = cache.apply(key,
+                () -> content2.execute(),
+                Duration.ofSeconds(60),
+                (value) -> content2.isResponseFromFallback());
+
+        item.observeOn(Schedulers.io());
+        item.subscribeOn(Schedulers.io());
+
+        assertSame(FailingBackEndRequest.FALLBACK, item.toBlocking().value().value());
+
+        assertTrue(content.isResponseFromFallback());
+
+        assertNotNull(((Single<CacheItem<Content>>) cache.get(key)).toBlocking().value().value());
+
+
+
+    }
 }

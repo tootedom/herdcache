@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentMap;
 /**
  *
  */
-public class NoOpConcurrentMap<V> implements ConcurrentMap<String,ListenableFuture<V>> {
+public class NoOpConcurrentMap<V> implements ConcurrentMap<String,V> {
     @Override
     public int size() {
         return 0;
@@ -32,22 +32,22 @@ public class NoOpConcurrentMap<V> implements ConcurrentMap<String,ListenableFutu
     }
 
     @Override
-    public ListenableFuture<V> get(Object key) {
+    public V get(Object key) {
         return null;
     }
 
     @Override
-    public ListenableFuture<V> put(String key, ListenableFuture<V> value) {
+    public V put(String key, V value) {
         return null;
     }
 
     @Override
-    public ListenableFuture<V> remove(Object key) {
+    public V remove(Object key) {
         return null;
     }
 
     @Override
-    public void putAll(Map<? extends String, ? extends ListenableFuture<V>> m) {
+    public void putAll(Map<? extends String, ? extends V> m) {
 
     }
 
@@ -62,17 +62,17 @@ public class NoOpConcurrentMap<V> implements ConcurrentMap<String,ListenableFutu
     }
 
     @Override
-    public Collection<ListenableFuture<V>> values() {
+    public Collection<V> values() {
         return null;
     }
 
     @Override
-    public Set<Entry<String, ListenableFuture<V>>> entrySet() {
+    public Set<Entry<String, V>> entrySet() {
         return null;
     }
 
     @Override
-    public ListenableFuture<V> putIfAbsent(String key, ListenableFuture<V> value) {
+    public V putIfAbsent(String key, V value) {
         return null;
     }
 
@@ -82,12 +82,12 @@ public class NoOpConcurrentMap<V> implements ConcurrentMap<String,ListenableFutu
     }
 
     @Override
-    public boolean replace(String key, ListenableFuture<V> oldValue, ListenableFuture<V> newValue) {
+    public boolean replace(String key, V oldValue, V newValue) {
         return false;
     }
 
     @Override
-    public ListenableFuture<V> replace(String key, ListenableFuture<V> value) {
+    public V replace(String key, V value) {
         return null;
     }
 }

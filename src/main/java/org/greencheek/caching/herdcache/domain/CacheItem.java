@@ -15,6 +15,26 @@ public class CacheItem<V> {
         this.fromCache = fromCache;
     }
 
+    public Optional<V> optional() {
+        return value;
+    }
+
+    /**
+     * Returns null if the optional is empty
+     * @return
+     */
+    public V value() {
+        if(value.isPresent()) {
+            return value.get();
+        } else {
+            return null;
+        }
+    }
+
+    public V value(V defaultVal) {
+        return value.isPresent() ? value.get() : defaultVal;
+    }
+
     public Optional<V> getValue() {
         return value;
     }
@@ -27,5 +47,13 @@ public class CacheItem<V> {
 
     public String toString() {
         return value.toString();
+    }
+
+    public boolean isEmpty() {
+        return !value.isPresent();
+    }
+
+    public boolean hasValue() {
+        return value.isPresent();
     }
 }

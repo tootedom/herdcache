@@ -1,11 +1,8 @@
 package org.greencheek.caching.herdcache.memcached;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import net.spy.memcached.ConnectionFactoryBuilder;
-import org.greencheek.caching.herdcache.CacheWithExpiry;
-import org.greencheek.caching.herdcache.IsSupplierValueCachable;
 import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
@@ -18,7 +15,6 @@ import org.junit.Test;
 import rx.Single;
 
 import java.time.Duration;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 
 import static org.junit.Assert.*;
@@ -130,9 +126,9 @@ public class TestObservableSettingCacheValues {
                 assertEquals("Value should be 'value1'", "value1", item.getValue().get()));
 
         val = cache.get("Key1");
+        String item = val.toBlocking().value().value();
 
-        val.subscribe(item ->
-                assertEquals("Value should be 'value1'", "value1", item.getValue().get()));
+        assertEquals("Value should be 'value1'", "value1", item);
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
@@ -141,8 +137,8 @@ public class TestObservableSettingCacheValues {
             Thread.sleep(2500);
             val = cache.get("Key1");
 
-            val.subscribe(item ->
-                    assertFalse("Value should be 'null'",item.getValue().isPresent()));
+            CacheItem<String> nullItem = val.toBlocking().value();
+            assertFalse("Value should be 'null'",nullItem.hasValue());
 
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -151,5 +147,157 @@ public class TestObservableSettingCacheValues {
 
     }
 
+
+
+    @Test
+    public void testNoCacheAvailable() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("")
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        Single<CacheItem<String>> val = cache.set("Key1", () -> "value1",Duration.ofSeconds(1));
+
+        val.subscribe(item ->
+                assertEquals("Value should be 'value1'", "value1", item.getValue().get()));
+
+        val = cache.get("Key1");
+        String item = val.toBlocking().value().value();
+
+        assertNull("Value should be 'value1'", item);
+
+        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
+
+
+        final String value = "from supplier";
+        Single<CacheItem<String>> applyCache = cache.apply("Key1", () -> value,Duration.ofSeconds(1));
+
+        assertEquals("Value should be '"+ value +"'", value, applyCache.toBlocking().value().value());
+
+
+
+
+        applyCache = cache.apply("Key1", () -> {
+            throw new RuntimeException("blah blah blah");
+        },Duration.ofSeconds(1));
+
+        try {
+            assertEquals("Value should be '" + value + "'", value, applyCache.toBlocking().value());
+            fail("exception expected");
+        } catch (RuntimeException e) {
+
+        }
+
+    }
+
+
+
+    @Test
+    public void testDeleteCacheValues() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        Single<CacheItem<String>> val = cache.set("Key1", () -> "value1",Duration.ofSeconds(60));
+
+        val.subscribe(item ->
+                assertEquals("Value should be 'value1'", "value1", item.getValue().get()));
+
+        val = cache.get("Key1");
+        String item = val.toBlocking().value().value();
+
+        assertNotNull("Value should be 'value1'", item);
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+
+        final String value = "from supplier";
+        Single<CacheItem<String>> applyCache = cache.apply("Key2", () -> value,Duration.ofSeconds(60));
+
+        assertEquals("Value should be '"+ value +"'", value, applyCache.toBlocking().value().value());
+
+
+
+
+        applyCache = cache.apply("Key2", () -> {
+            throw new RuntimeException("blah blah blah");
+        },Duration.ofSeconds(60));
+
+
+        assertEquals("Value should be '" + value + "'", value, applyCache.toBlocking().value().value());
+
+        assertEquals(2, memcached.getDaemon().getCache().getCurrentItems());
+        assertEquals(3, memcached.getDaemon().getCache().getGetCmds());
+        assertEquals(2, memcached.getDaemon().getCache().getSetCmds());
+
+        Single<Boolean> delete = cache.clear("Key1");
+        Single<Boolean> delete2 = cache.clear("Key2");
+
+        assertTrue(delete.toBlocking().value().booleanValue());
+        assertTrue(delete2.toBlocking().value().booleanValue());
+
+
+        final String newValue = "from supplier new value";
+        applyCache = cache.apply("Key2", () -> newValue,Duration.ofSeconds(60));
+
+        assertEquals("Value should be '"+ newValue +"'", newValue, applyCache.toBlocking().value().value());
+
+        memcached.getDaemon().stop();
+
+        delete2 = cache.clear("Key2");
+        assertFalse(delete2.toBlocking().value().booleanValue());
+
+    }
+
+    @Test
+    public void testDeleteCacheValuesSmallWait() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(1))
+                        .buildMemcachedConfig()
+        );
+
+        String value = "value1";
+        Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
+
+        val.subscribe(item ->
+                assertEquals("Value should be '"+value+"'", value, item.getValue().get()));
+
+        val = cache.get("Key1");
+        String item = val.toBlocking().value().value();
+
+        assertNotNull("Value should be 'value1'", item);
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+
+        Single<Boolean> delete = cache.clear("Key1");
+
+        assertFalse(delete.toBlocking().value().booleanValue());
+
+        final String newValue = "from supplier new value";
+        Single<CacheItem<String>> applyCache = cache.apply("Key1", () -> newValue,Duration.ofSeconds(60));
+
+        assertEquals("Value should be '"+ value +"'", value, applyCache.toBlocking().value().value());
+
+        memcached.getDaemon().stop();
+
+    }
 
 }
