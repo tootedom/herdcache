@@ -4,7 +4,7 @@
 
     <groupId>org.greencheek.caching</groupId>
     <artifactId>herdcache</artifactId>
-    <version>1.0.41-SNAPSHOT</version>
+    <version>2.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>herdcache</name>
@@ -50,7 +50,7 @@
         <maven-plugin-plugin.version>3.2</maven-plugin-plugin.version>
         <maven-shade-plugin.version>2.2</maven-shade-plugin.version>
         <maven-site-plugin.version>3.3</maven-site-plugin.version>
-        <logback.version>1.1.1</logback.version>
+        <logback.version>1.1.5</logback.version>
 
         <guava.version>19.0</guava.version>
         <concurrentlinkedhashmap.version>1.4.2</concurrentlinkedhashmap.version>
@@ -68,6 +68,7 @@
         <fst.version>1.63</fst.version>
         <jmh.version>1.10.4</jmh.version>
         <metrics.version>3.1.0</metrics.version>
+        <rx.version>1.2.0</rx.version>
     </properties>
     <dependencies>
         <!--<dependency>-->
@@ -114,6 +115,11 @@
             <artifactId>hystrix-core</artifactId>
             <version>${hystrix.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.reactivex</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>${rx.version}</version>
         </dependency>
         <dependency>
             <groupId>net.spy</groupId>

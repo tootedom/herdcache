@@ -7,6 +7,7 @@ import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
+import rx.Scheduler;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -45,6 +46,7 @@ public class MemcachedCacheConfig {
     private final MetricRecorder metricsRecorder;
     private final LocatorFactory locatorFactory;
     private final boolean herdProtectionEnabled;
+    private final Scheduler waitForMemcachedSetRxScheduler;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -74,7 +76,8 @@ public class MemcachedCacheConfig {
                                 Duration waitForRemove,
                                 MetricRecorder metricsRecorder,
                                 LocatorFactory locatorFactory,
-                                boolean herdProtectionEnabled) {
+                                boolean herdProtectionEnabled,
+                                Scheduler waitForMemcachedSetRxScheduler) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -104,6 +107,7 @@ public class MemcachedCacheConfig {
         this.metricsRecorder = metricsRecorder;
         this.locatorFactory = locatorFactory;
         this.herdProtectionEnabled = herdProtectionEnabled;
+        this.waitForMemcachedSetRxScheduler = waitForMemcachedSetRxScheduler;
     }
 
     public Duration getTimeToLive() {
@@ -236,5 +240,9 @@ public class MemcachedCacheConfig {
      */
     public boolean isHerdProtectionEnabled() {
         return herdProtectionEnabled;
+    }
+
+    public Scheduler getWaitForMemcachedSetRxScheduler() {
+        return waitForMemcachedSetRxScheduler;
     }
 }

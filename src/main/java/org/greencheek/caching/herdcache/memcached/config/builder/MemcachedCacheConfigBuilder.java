@@ -18,6 +18,8 @@ import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.com
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.CompressionAlgorithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.LZ4NativeCompression;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.compression.SnappyCompression;
+import rx.Scheduler;
+import rx.schedulers.Schedulers;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -57,6 +59,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private CompressionAlgorithm compressionAlgorithm = CompressionAlgorithm.SNAPPY;
     private boolean herdProtectionEnabled = true;
 
+    private Scheduler waitForMemcachedSetRxScheduler = Schedulers.io();
+
     public MemcachedCacheConfig buildMemcachedConfig()
     {
        return new MemcachedCacheConfig(
@@ -76,7 +80,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                waitForRemove,
                metricRecorder,
                locatorFactory,
-               herdProtectionEnabled);
+               herdProtectionEnabled,
+               waitForMemcachedSetRxScheduler);
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -259,6 +264,11 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T disableHerdProtection() {
         this.herdProtectionEnabled = false;
+        return self();
+    }
+
+    public T setWaitForMemcachedSetRxScheduler(Scheduler waitForMemcachedSetRxScheduler) {
+        this.waitForMemcachedSetRxScheduler = waitForMemcachedSetRxScheduler;
         return self();
     }
 }

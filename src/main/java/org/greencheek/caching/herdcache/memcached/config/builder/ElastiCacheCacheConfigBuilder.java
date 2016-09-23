@@ -158,6 +158,4 @@ public class ElastiCacheCacheConfigBuilder extends MemcachedCacheConfigBuilder<E
         return super.buildMemcachedConfig();
     }
 
-
-
 }
