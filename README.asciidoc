@@ -550,6 +550,30 @@ Supplier Value: RxIoScheduler-2
 subscription: RxComputationScheduler-1
 ----
 
+'''
+
+==== Async Write to memcached
+
+It is the value of the MemcachedCacheConfigBuilder.setWaitForMemcachedSet(true|false) that determines if the writing
+of the value to memcached runs on the same scheduler as .subscribeOn or not.
+
+When set to true, the memcached write will be written on the same scheduler that the `.subscribeOn` runs
+(http://reactivex.io/documentation/operators/subscribeon.html).
+
+When it is set to false, the default is for the memcached write to run on the `Schedulers.io()` thread pool.
+You can choose the pool the write operates on by setting `MemcachedCacheConfigBuilder.setWaitForMemcachedSetRxScheduler(Scheduler scheduler)`.
+Setting it to schedulers.immediate() is the same as `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(true)`
+
+When setting `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(false)` you need to be wary of the default timeout for
+the memcached write to complete in, which is 2 seconds. If you which to increase this set `MemcachedCacheConfigBuilder.setWaitDuration(Duration d)`
+to something larger. For example:
+
+[source,java]
+----
+.setWaitDuration(Duration.ofSeconds(5))
+----
+
+'''
 
 = Non Observable
 
