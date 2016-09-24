@@ -195,7 +195,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                     @Override
                     public void call(SingleSubscriber<? super CacheItem<V>> singleSubscriber) {
                         V result = getFromDistributedCache(client,keyString);
-                        singleSubscriber.onSuccess(new CacheItem<V>(keyString,result,result == null));
+                        singleSubscriber.onSuccess(new CacheItem<V>(keyString,result,result != null));
                     }
                 }).toObservable().cacheWithInitialCapacity(1).toSingle();
 

@@ -18,6 +18,7 @@ import rx.Single;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.*;
 
@@ -266,7 +267,7 @@ public class TestObservableSettingCacheValues {
                         .setTimeToLive(Duration.ofSeconds(10))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
-                        .setWaitForRemove(Duration.ofMillis(1))
+                        .setWaitForRemove(Duration.ofMillis(0))
                         .buildMemcachedConfig()
         );
 
@@ -283,12 +284,89 @@ public class TestObservableSettingCacheValues {
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
-
         Single<Boolean> delete = cache.clear("Key1");
-        assertFalse(delete.toBlocking().value().booleanValue());
+        assertNotNull(delete.toBlocking().value().booleanValue());
 
 
     }
+
+
+    @Test
+    public void testErrorSubscriber() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(1))
+                        .buildMemcachedConfig()
+        );
+
+        Single<CacheItem<String>> val = cache.set("Key1", () -> {throw new RuntimeException("lkkjlkj");},Duration.ofSeconds(60));
+
+        final AtomicBoolean hasErrored = new AtomicBoolean(false);
+
+        val.subscribe(item -> {
+            hasErrored.set(false);
+        }, throwa -> {
+            hasErrored.set(true);
+        });
+
+
+        assertTrue("should have errored", hasErrored.get());
+
+
+        val = cache.apply("Key1", () -> {throw new RuntimeException("lkkjlkj");},Duration.ofSeconds(60));
+
+        hasErrored.set(false);
+
+        val.subscribe(item -> {
+            hasErrored.set(false);
+        }, throwa -> {
+            hasErrored.set(true);
+        });
+
+
+        assertTrue("should have errored",hasErrored.get());
+    }
+
+
+    @Test
+    public void testFromCacheSetting() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(1))
+                        .buildMemcachedConfig()
+        );
+
+        Single<CacheItem<String>> get = cache.get("Key1");
+        assertFalse("value should not be from cache",get.toBlocking().value().isFromCache());
+
+
+        String value = "value";
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> value, Duration.ofSeconds(60));
+
+
+
+        assertFalse("value should not be from cache",val.toBlocking().value().isFromCache());
+        assertEquals("value should not be from cache", value,val.toBlocking().value().value());
+
+
+        val = cache.apply("Key1", () -> value, Duration.ofSeconds(60));
+
+        assertTrue("value should not be from cache", val.toBlocking().value().isFromCache());
+        assertEquals("value should not be from cache", value,val.toBlocking().value().value());
+
+
+    }
+
 
 
     @Test

@@ -140,7 +140,7 @@ Each of the write methods, apply and set, allow the value to be calculated from 
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
 </dependency>
 ----
 
@@ -177,10 +177,82 @@ further:
 
 = Observable
 
-This is new as of 2.0.0, and is an implementation of herd cache using RxJava.
+This is new as of 2.0.1, and is an implementation of herd cache using RxJava.  The Single<CacheItem<V>> has been tested with
+version 1.1.1 and 1.2.0, and appears to be working as expected (on my machine. dot tm')
 
 == RxJava Support
 
+The new observable cache interface `ObservableCache<V extends Serializable>`, is focused at RxJava support.  The two
+implementations:
+
+- `SpyObservableMemcachedCache<V extends Serializable>`
+- `ElastiCacheObservableMemcachedCache<V extends Serializable>`
+
+implement this interface, which has the methods:
+
+- default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive) // Supplier Values always valid, and Cache values always valid
+- default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable) // Cache values always valid
+- default Single<CacheItem<V>> apply(String key, Supplier<V> computation,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid) // No TTL for cached item
+- default public Single<CacheItem<V>> set(String keyString, Supplier<V> value, Duration timeToLive) // Supplier Value is always valid
+- default public Single<CacheItem<V>> set(String keyString, V value, Duration timeToLive)   // Supplier Value is always valid
+
+
+- public Single<CacheItem<V>> get(String key);
+- public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)
+- public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);
+- public Single<Boolean> clear(String key);
+- public void shutdown();
+
+
+All implementations return the RxJava Observable implementation `Single<CacheItem<V>>`.   Which means a single value is
+returned, or a Throwable.
+
+
+The RxJava Support does not implement a "Stale With Revalidate" notion.  The reason being is that this is entirely implementable/customizable
+ on the client side.
+
+=== CacheItem
+
+The `CacheItem<V>` return type is just a wrapper around your `V` implementation type.   `V` is the object type that is stored/serialised
+to memcached.
+
+
+=== RxJava Write To Memcache (to be aware of)
+
+The apply and set methods, the actual write to memcached can be either synchronous or asynchronous.  By default the memcached write
+is that of asynchronous.
+
+````
+- public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)
+- public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);
+````
+
+It is the value of the `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(true|false)` that determines if the writing of
+the value to memcached runs on the same scheduler as `.subscribeOn` or not.
+
+When set to true, the memcached write will be written on the same scheduler that the `.subscribeOn` runs
+(http://reactivex.io/documentation/operators/subscribeon.html).
+
+When it is set to false, the default is for the memcached write to run on the `Schedulers.io` thread pool.  You can choose
+the pool the write operates on by setting `MemcachedCacheConfigBuilder.setWaitForMemcachedSetRxScheduler(Scheduler scheduler)`.
+Setting it to schedulers.immediate() is the same as `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(true)`
+
+When setting `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(false)` you need to be wary of the default timeout for the
+memcached write to complete in, which is 2 seconds.   If you which to increase this set
+`MemcachedCacheConfigBuilder.setWaitDuration(Duration d)` to something larger.  For example:
+
+````
+.setWaitDuration(Duration.ofSeconds(5))
+````
+
+=== What about Stale While Revalidate
+
+The `ObservableCache` is returning the domain object of `CacheItem`.  This has a `isFromCache` method that tells you if
+the `apply(...)` command returned the value from cache or not.  You can use this to start you "stale" cache implementation.
+
+If you want to implement your stale caching implementation based on the "actual" cache value you cached, then is entirely
+possible.  See the test `org.greencheek.caching.herdcache.memcached.observable.TestExampleStaleWhileRevalidateObservableCache`
+as an example based on the actual value.
 
 
 '''
