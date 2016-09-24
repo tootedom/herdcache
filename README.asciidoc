@@ -256,7 +256,7 @@ If you want to implement your stale caching implementation based on the "actual"
 possible.  See the test `org.greencheek.caching.herdcache.memcached.observable.TestExampleStaleWhileRevalidateObservableCache`
 as an example based on the actual value.
 
-[Stale White Revalidate Example!](src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExampleStaleWhileRevalidateObservableCache.java)
+link:src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExampleStaleWhileRevalidateObservableCache.java[Stale White Revalidate Example]
 
 
 '''
