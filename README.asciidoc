@@ -190,18 +190,18 @@ implementations:
 
 implement this interface, which has the methods:
 
-- default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive) // Supplier Values always valid, and Cache values always valid
-- default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable) // Cache values always valid
-- default Single<CacheItem<V>> apply(String key, Supplier<V> computation,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid) // No TTL for cached item
-- default public Single<CacheItem<V>> set(String keyString, Supplier<V> value, Duration timeToLive) // Supplier Value is always valid
-- default public Single<CacheItem<V>> set(String keyString, V value, Duration timeToLive)   // Supplier Value is always valid
+- `default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive) // Supplier Values always valid, and Cache values always valid`
+- `default public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable) // Cache values always valid`
+- `default Single<CacheItem<V>> apply(String key, Supplier<V> computation,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid) // No TTL for cached item`
+- `default public Single<CacheItem<V>> set(String keyString, Supplier<V> value, Duration timeToLive) // Supplier Value is always valid`
+- `default public Single<CacheItem<V>> set(String keyString, V value, Duration timeToLive)   // Supplier Value is always valid`
 
 
-- public Single<CacheItem<V>> get(String key);
-- public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)
-- public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);
-- public Single<Boolean> clear(String key);
-- public void shutdown();
+- `public Single<CacheItem<V>> get(String key);`
+- `public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)`
+- `public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);`
+- `public Single<Boolean> clear(String key);`
+- `public void shutdown();`
 
 
 All implementations return the RxJava Observable implementation `Single<CacheItem<V>>`.   Which means a single value is
