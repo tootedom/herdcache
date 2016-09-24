@@ -15,6 +15,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import rx.Single;
+import rx.functions.Action1;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -360,6 +361,61 @@ public class TestObservableSettingCacheValues {
 
     }
 
+
+    class MyFunkyException extends RuntimeException {
+
+    }
+
+    @Test
+    public void testRuntimeException() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        Single<CacheItem<String>> val = cache.set("Key1", () -> {throw new MyFunkyException();} , Duration.ofSeconds(60));
+
+        boolean errorThrown = false;
+        try {
+            String item =  val.toBlocking().value().value();
+        } catch (MyFunkyException e) {
+            errorThrown = true;
+        }
+
+        assertTrue("should have thrown custom exception",errorThrown);
+
+        final AtomicBoolean success = new AtomicBoolean(false);
+        final AtomicBoolean failure = new AtomicBoolean(false);
+
+        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
+
+        val.subscribe(
+                new Action1<CacheItem<String>>() {
+                    @Override
+                    public void call(CacheItem<String> stringCacheItem) {
+                        success.set(true);
+                    }
+                },
+                new Action1<Throwable>() {
+                    @Override
+                    public void call(Throwable throwable) {
+                        if(throwable instanceof MyFunkyException) {
+                            failure.set(true);
+                        }
+                    }
+                });
+
+        assertFalse("should have thrown an exception",success.get());
+        assertTrue("should have thrown custom exception", failure.get());
+    }
 
     @Test
     public void testLazyCacheDelete() {

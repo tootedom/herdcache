@@ -312,13 +312,109 @@ link:src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExa
 
 [source,java]
 ----
-Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
+Single<CacheItem<String>> val = cache.set("Key1", () -> "SomeValue",Duration.ofSeconds(60));
 // The above just creates the Observable.  Nothing has happened.  If you do not subscribe
 // The item will never be set in the cache.
 
 
 // Register a subscriber to have the set execute
 String itemSet = val.toBlocking().value().value());
+----
+
+- Get Or Set an item in the cache
+
+If "Key1" already exists in the cache then it is returned.  Otherwise the new value is returned, and set in the cache
+
+[source,java]
+----
+Single<CacheItem<String>> val = cache.apply("Key1", () -> "NewValue",Duration.ofSeconds(60));
+// The above just creates the Observable.  Nothing has happened.  If you do not subscribe
+// The item will never be set in the cache.
+
+
+// Register a subscriber to have the set execute
+String itemSet = val.toBlocking().value().value());
+----
+
+
+- Get an item from the cache
+
+[source,java]
+----
+Single<CacheItem<String>> val = cache.get("Key1")
+// The above just creates the Observable.  Nothing has happened.  If you do not subscribe
+// The item will never be set in the cache.
+
+
+// Register a subscriber to have the get execute, and return a value
+String item = val.toBlocking().value().value());
+----
+
+
+In all of the above examples, we assume no Runtime Exceptions occur, when the value is obtained from the `Supplier<V>`
+(from `set(...)` and `apply(...)`).  If the Supplier throws an exception they will be propagated to the Subscriber.
+(Exceptions from readding or writing to memcached will _NOT_ be propagate to Subscribers).
+
+Therefore, if you expect that an exception can be thrown from your supplier, you should pass in the appropriate onError
+action to the subscribe.  Example:
+
+[source,java]
+----
+    class MyFunkyException extends RuntimeException {
+
+    }
+
+    @Test
+    public void testRuntimeException() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        Single<CacheItem<String>> val = cache.set("Key1", () -> {throw new MyFunkyException();} , Duration.ofSeconds(60));
+
+        boolean errorThrown = false;
+        try {
+            String item =  val.toBlocking().value().value();
+        } catch (MyFunkyException e) {
+            errorThrown = true;
+        }
+
+        assertTrue("should have thrown custom exception",errorThrown);
+
+        final AtomicBoolean success = new AtomicBoolean(false);
+        final AtomicBoolean failure = new AtomicBoolean(false);
+
+        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
+
+        val.subscribe(
+                new Action1<CacheItem<String>>() {
+                    @Override
+                    public void call(CacheItem<String> stringCacheItem) {
+                        success.set(true);
+                    }
+                },
+                new Action1<Throwable>() {
+                    @Override
+                    public void call(Throwable throwable) {
+                        if(throwable instanceof MyFunkyException) {
+                            failure.set(true);
+                        }
+                    }
+                });
+
+        assertFalse("should have thrown an exception",success.get());
+        assertTrue("should have thrown custom exception", failure.get());
+    }
+
 ----
 
 
