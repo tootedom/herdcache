@@ -254,7 +254,9 @@ the `apply(...)` command returned the value from cache or not.  You can use this
 
 If you want to implement your stale caching implementation based on the "actual" cache value you cached, then is entirely
 possible.  See the test `org.greencheek.caching.herdcache.memcached.observable.TestExampleStaleWhileRevalidateObservableCache`
-([Stale White Revalidate Example!](src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExampleStaleWhileRevalidateObservableCache.java)) as an example based on the actual value.
+as an example based on the actual value.
+
+[Stale White Revalidate Example!](src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExampleStaleWhileRevalidateObservableCache.java)
 
 
 '''
