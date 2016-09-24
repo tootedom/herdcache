@@ -222,13 +222,12 @@ to memcached.
 The apply and set methods, the actual write to memcached can be either synchronous or asynchronous.  By default the memcached write
 is that of asynchronous.
 
-````
-public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)
-````
 
-````
-public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);
-````
+- `public Single<CacheItem<V>> apply(String key, Supplier<V> computation, Duration timeToLive,Predicate<V> isSupplierValueCachable,Predicate<V> isCachedValueValid)`
+
+
+- `public Single<CacheItem<V>> set(String keyString, Supplier<V> computation, Duration timeToLive,Predicate<V> canCacheValueEvaluator);`
+
 
 It is the value of the `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(true|false)` that determines if the writing of
 the value to memcached runs on the same scheduler as `.subscribeOn` or not.
