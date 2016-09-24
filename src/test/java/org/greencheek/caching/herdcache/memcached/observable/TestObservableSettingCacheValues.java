@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.memcached;
+package org.greencheek.caching.herdcache.memcached.observable;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -6,6 +6,7 @@ import net.spy.memcached.ConnectionFactoryBuilder;
 import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
+import org.greencheek.caching.herdcache.memcached.SpyObservableMemcachedCache;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
@@ -26,13 +27,10 @@ public class TestObservableSettingCacheValues {
 
 
     private MemcachedDaemonWrapper memcached;
-    private ListeningExecutorService executorService;
     private ObservableCache<String> cache;
 
     @Before
     public void setUp() {
-        executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
-
         memcached = MemcachedDaemonFactory.createMemcachedDaemon(false);
 
         if(memcached.getDaemon()==null) {
@@ -48,11 +46,8 @@ public class TestObservableSettingCacheValues {
             memcached.getDaemon().stop();
         }
 
-        if(cache!=null && cache instanceof RequiresShutdown) {
-            ((RequiresShutdown) cache).shutdown();
-        }
+       cache.shutdown();
 
-        executorService.shutdownNow();
     }
 
     @Test

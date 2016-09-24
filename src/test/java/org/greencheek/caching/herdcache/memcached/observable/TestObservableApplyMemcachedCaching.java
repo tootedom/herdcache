@@ -1,31 +1,28 @@
-package org.greencheek.caching.herdcache.memcached;
+package org.greencheek.caching.herdcache.memcached.observable;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.netflix.hystrix.HystrixCommand;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.HashAlgorithm;
 import org.greencheek.caching.herdcache.Cache;
-import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
-import org.greencheek.caching.herdcache.exceptions.UnableToScheduleCacheGetExecutionException;
-import org.greencheek.caching.herdcache.exceptions.UnableToSubmitSupplierForExecutionException;
+import org.greencheek.caching.herdcache.memcached.SpyObservableMemcachedCache;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
-import org.greencheek.caching.herdcache.memcached.keyhashing.KeyHashingType;
 import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.JenkinsHash;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.XXHashAlogrithm;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.FastSerializingTranscoder;
-import org.greencheek.caching.herdcache.memcached.spy.extensions.transcoders.SerializingTranscoder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
-import org.greencheek.caching.herdcache.util.*;
+import org.greencheek.caching.herdcache.util.Content;
+import org.greencheek.caching.herdcache.util.FailingBackEndRequest;
+import org.greencheek.caching.herdcache.util.ObservableBackEndRequest;
+import org.greencheek.caching.herdcache.util.RestClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -499,12 +496,10 @@ public class TestObservableApplyMemcachedCaching {
             "\n" + UUID.randomUUID().toString();
 
     private MemcachedDaemonWrapper memcached;
-    private ListeningExecutorService executorService;
     private ObservableCache cache;
 
     @Before
     public void setUp() {
-        executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
 
         memcached = MemcachedDaemonFactory.createMemcachedDaemon(false);
 
@@ -521,11 +516,8 @@ public class TestObservableApplyMemcachedCaching {
             memcached.getDaemon().stop();
         }
 
-        if (cache != null && cache instanceof RequiresShutdown) {
-            ((RequiresShutdown) cache).shutdown();
-        }
+        cache.shutdown();
 
-        executorService.shutdownNow();
     }
 
     private void testHashAlgorithm(HashAlgorithm algo) {

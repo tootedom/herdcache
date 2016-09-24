@@ -1,4 +1,4 @@
-package org.greencheek.caching.herdcache.memcached;
+package org.greencheek.caching.herdcache.memcached.observable;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -10,6 +10,7 @@ import org.greencheek.caching.herdcache.CacheWithExpiry;
 import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
+import org.greencheek.caching.herdcache.memcached.ElastiCacheObservableMemcachedCache;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.server.StringServer;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
@@ -38,12 +39,10 @@ public class TestSimpleElastiCacheObservableMemcachedCaching {
 
 
     private MemcachedDaemonWrapper memcached;
-    private ListeningExecutorService executorService;
     private ObservableCache cache;
 
     @Before
     public void setUp() {
-        executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
 
         memcached = MemcachedDaemonFactory.createMemcachedDaemon(false);
 
@@ -60,12 +59,7 @@ public class TestSimpleElastiCacheObservableMemcachedCaching {
             memcached.getDaemon().stop();
         }
 
-        if(cache!=null && cache instanceof RequiresShutdown) {
-            ((RequiresShutdown) cache).shutdown();
-        }
-
-        executorService.shutdownNow();
-
+        cache.shutdown();
     }
 
     private void testHashAlgorithm(HashAlgorithm algo) {
@@ -254,7 +248,7 @@ public class TestSimpleElastiCacheObservableMemcachedCaching {
             item.subscribeOn(Schedulers.computation())
             .observeOn(Schedulers.io())
             .subscribe(stringValue -> {
-                if(value.equals(stringValue.value())) {
+                if (value.equals(stringValue.value())) {
                     matches.incrementAndGet();
                 }
                 latch.countDown();
