@@ -16,9 +16,11 @@ import org.junit.Before;
 import org.junit.Test;
 import rx.Single;
 import rx.functions.Action1;
+import rx.schedulers.Schedulers;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -327,6 +329,48 @@ public class TestObservableSettingCacheValues {
         }
         assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
     }
+
+
+
+    @Test
+    public void testCacheSetSubscribeOn() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        CountDownLatch latch = new CountDownLatch(1);
+        String value = "value1";
+        Single<CacheItem<String>> val = cache.apply("Key1", () -> {
+            System.out.println("Supplier Value: " + Thread.currentThread().getName());
+            return value;
+        }, Duration.ofSeconds(60));
+        val = val.subscribeOn(Schedulers.io());
+        val = val.observeOn(Schedulers.computation());
+
+        val.subscribe(calculatedValue -> {
+            System.out.println("subscription: " + Thread.currentThread().getName());
+            latch.countDown();
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+
+    }
+
 
     @Test
     public void testLazyCacheGet() {
