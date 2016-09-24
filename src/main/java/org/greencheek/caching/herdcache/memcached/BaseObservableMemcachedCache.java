@@ -44,7 +44,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
                 config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
                 config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType(),
-                config.getLocatorFactory(), MoreExecutors.newDirectExecutorService());
+                config.getLocatorFactory(), config.getKeyValidationType(),MoreExecutors.newDirectExecutorService());
     }
 
     public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {

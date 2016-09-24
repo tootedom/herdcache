@@ -8,6 +8,7 @@ import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
 import org.greencheek.caching.herdcache.memcached.SpyObservableMemcachedCache;
+import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
@@ -59,6 +60,7 @@ public class TestExampleStaleWhileRevalidateObservableCache {
                         .setTimeToLive(Duration.ofSeconds(10))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
+                        .setKeyValidationType(KeyValidationType.NONE)
                         .buildMemcachedConfig()
         );
 
@@ -168,7 +170,7 @@ public class TestExampleStaleWhileRevalidateObservableCache {
         }
 
         assertEquals("We expect that the stale value is always found",100,originalStaleValueFound.get());
-        assertEquals("We expect that the stale value refreshed once",1,revalidator.timesRevalidationRun());
+        assertEquals("We expect that the stale value refreshed once", 1, revalidator.timesRevalidationRun());
         assertEquals("The stale value should have been updated to:"+newValue, newValue, cache.get(key).toBlocking().value().value());
 
 

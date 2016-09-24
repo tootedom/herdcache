@@ -47,6 +47,7 @@ public class MemcachedCacheConfig {
     private final LocatorFactory locatorFactory;
     private final boolean herdProtectionEnabled;
     private final Scheduler waitForMemcachedSetRxScheduler;
+    private final KeyValidationType keyValidationType;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -77,7 +78,8 @@ public class MemcachedCacheConfig {
                                 MetricRecorder metricsRecorder,
                                 LocatorFactory locatorFactory,
                                 boolean herdProtectionEnabled,
-                                Scheduler waitForMemcachedSetRxScheduler) {
+                                Scheduler waitForMemcachedSetRxScheduler,
+                                KeyValidationType keyValidationType) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -108,6 +110,7 @@ public class MemcachedCacheConfig {
         this.locatorFactory = locatorFactory;
         this.herdProtectionEnabled = herdProtectionEnabled;
         this.waitForMemcachedSetRxScheduler = waitForMemcachedSetRxScheduler;
+        this.keyValidationType = keyValidationType;
     }
 
     public Duration getTimeToLive() {
@@ -244,5 +247,9 @@ public class MemcachedCacheConfig {
 
     public Scheduler getWaitForMemcachedSetRxScheduler() {
         return waitForMemcachedSetRxScheduler;
+    }
+
+    public KeyValidationType getKeyValidationType() {
+        return keyValidationType;
     }
 }

@@ -21,11 +21,11 @@ public class NoValidationConnectionFactory extends DefaultConnectionFactory {
     public MemcachedConnection createConnection(List<InetSocketAddress> addrs)
             throws IOException {
         if(doKeyValidation) {
-            return new NoKeyValidationMemcachedConnection(getReadBufSize(), this, addrs,
-                    getInitialObservers(), getFailureMode(), getOperationFactory());
-        } else {
             return new StaticLoggerMemcachedConnection(getReadBufSize(),this,addrs,
                     getInitialObservers(),getFailureMode(),getOperationFactory());
+        } else {
+            return new NoKeyValidationMemcachedConnection(getReadBufSize(), this, addrs,
+                    getInitialObservers(), getFailureMode(), getOperationFactory());
         }
     }
 

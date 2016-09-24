@@ -12,6 +12,7 @@ import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
 import org.greencheek.caching.herdcache.memcached.SpyObservableMemcachedCache;
+import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.metrics.YammerMetricsRecorder;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.hashing.AsciiXXHashAlogrithm;
@@ -528,6 +529,7 @@ public class TestObservableApplyMemcachedCaching {
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
                         .setHashAlgorithm(algo)
+                        .setKeyValidationType(KeyValidationType.NONE)
                         .setKeyPrefix(Optional.of("elastic"))
                         .buildMemcachedConfig()
         );

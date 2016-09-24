@@ -47,7 +47,7 @@ import java.util.function.Supplier;
                 config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
                 config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType(),
-                config.getLocatorFactory());
+                config.getLocatorFactory(),config.getKeyValidationType());
     }
 
     public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {

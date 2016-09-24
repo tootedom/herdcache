@@ -7,6 +7,7 @@ import org.greencheek.caching.herdcache.ObservableCache;
 import org.greencheek.caching.herdcache.RequiresShutdown;
 import org.greencheek.caching.herdcache.domain.CacheItem;
 import org.greencheek.caching.herdcache.memcached.SpyObservableMemcachedCache;
+import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
@@ -59,6 +60,7 @@ public class TestObservableSettingCacheValues {
                         .setTimeToLive(Duration.ofSeconds(10))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
+                        .setKeyValidationType(KeyValidationType.ALWAYS)
                         .buildMemcachedConfig()
         );
 
@@ -283,16 +285,46 @@ public class TestObservableSettingCacheValues {
 
 
         Single<Boolean> delete = cache.clear("Key1");
-
         assertFalse(delete.toBlocking().value().booleanValue());
 
-        final String newValue = "from supplier new value";
-        Single<CacheItem<String>> applyCache = cache.apply("Key1", () -> newValue,Duration.ofSeconds(60));
-
-        assertEquals("Value should be '"+ value +"'", value, applyCache.toBlocking().value().value());
-
-        memcached.getDaemon().stop();
 
     }
 
+
+    @Test
+    public void testLargeKeyValue() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:11211")// + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(1))
+                        .setKeyValidationType(KeyValidationType.NONE)
+                        .buildMemcachedConfig()
+        );
+
+        String key = "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah"+
+                "blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah";
+
+        String value = "chickenshop";
+        Single<CacheItem<String>> val = cache.set(key, () -> value,Duration.ofSeconds(60));
+        assertEquals("Value should be '"+value+"'", value, val.toBlocking().value().value());
+//
+
+    }
 }

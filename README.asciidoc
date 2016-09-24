@@ -26,6 +26,103 @@ Returning a future also means that one request for a cache value from memcached 
 
 '''
 
+= New Features
+
+2.0.0 sees support for RxJava, and a new implementation of the caching to support RxJava.
+There is a new interface:
+
+````
+public interface ObservableCache<V extends Serializable>
+````
+
+Sorry if you wanted RxJava support to be backwards compatible.  It was just easier, and more efficient to implement the
+cache with RxJava support, as a completely new Interface and Implementation.
+
+The RxJava implementation has been tested with 1.1.1 and 1.2.0.  The dependency is 1.2.0.  The only reason for this is that
+`Single` is no longer beta in 1.2.0 (so I can only guess there's many many fixes between 1.1.1 and 1.2.0).
+
+The implementations are `SpyObservableMemcachedCache` and `ElastiCacheObservableMemcachedCache`.  Methods return `Single<CacheItem<V>>`
+
+See details future on for information regarding RxJava support.
+
+'''
+
+= Breaking Changes
+
+TL;DR  If you are using defaults your keys (under which items will be stored), will be different.  As a result, lots of cache misses.
+
+In all versions < 2, the following was the default for key hashing.  By Key hashing, I mean the value against which an item
+is ultimately stored in memcached.  If you request an item to be stored under "bob", the keyHashing changes this to a fixed width
+string that is the hash value, i.e. "45867239"
+
+````
+ KeyHashingType.NATIVE_XXHASH
+````
+
+This in hindesight (ah the beauty) is a stupid default.  Why? key collision.  Which means the two items you ask to be stored
+in the cache under different keys, could actually be stored under the same key.  i.e. collide.  The hashing algorithm with
+least collisions would have been the following (and much quicker on 64bit systems):
+
+````
+KeyHashingType.NATIVE_XXHASH_64
+````
+
+However, you'd still have the chance of a collision.  The best default is `NONE`.  The default to prefer "correctness" over
+performance.  The reason of chosing a hashing algorithm was to remove the "cache key checking" that the memcached client does
+for each key (MAX_KEY_LENGTH == 250), on any operation.  With a fixed length string, the below was not required:
+
+````
+  public static void validateKey(final String key, final boolean binary) {
+    byte[] keyBytes = KeyUtil.getKeyBytes(key);
+    int keyLength = keyBytes.length;
+
+    if (keyLength > MAX_KEY_LENGTH) {
+      throw KEY_TOO_LONG_EXCEPTION;
+    }
+
+    if (keyLength == 0) {
+      throw KEY_EMPTY_EXCEPTION;
+    }
+
+    if(!binary) {
+      for (byte b : keyBytes) {
+        if (b == ' ' || b == '\n' || b == '\r' || b == 0) {
+          throw new IllegalArgumentException(
+              "Key contains invalid characters:  ``" + key + "''");
+        }
+      }
+    }
+
+  }
+````
+
+However, as described we run the risk of "collisions".  Meaning you could get the unexpected.  A value stored under a key
+that you did not expect.
+
+As a result, the default hash changed to:
+
+````
+KeyHashingType.NONE
+````
+
+The result of this is that no hashing of the key is done.  The string you pass, is what the key is stored under in memcached,
+you need not worry about collisions.
+
+If you want to disable the key checking that is done for each operation, as you know your keys conform. You can set the following:
+
+````
+.setKeyValidationType(KeyValidationType.NONE)
+````
+
+This disables the previously mentioned key validation.  If you do have a key that doesn't conform, you will see messages
+like the following in your logs:
+
+````
+2016-09-24 12:36:11.176 ERROR net.spy.memcached.protocol.ascii.StoreOperationImpl:  Error:  CLIENT_ERROR bad command line format
+````
+
+'''
+
 = Usage
 
 The below details how to use the caching implementation, and the various ways to talk to the cache, which fall into 3 categories:
@@ -43,7 +140,7 @@ Each of the write methods, apply and set, allow the value to be calculated from 
 <dependency>
   <groupId>org.greencheek.caching</groupId>
   <artifactId>herdcache</artifactId>
-  <version>1.0.40</version>
+  <version>2.0.0</version>
 </dependency>
 ----
 
@@ -52,11 +149,23 @@ a couple of get methods.  Therefore, introduction a breaking change with the old
 
 = Cache Types
 
-There are currently two types of Cache interface. `Cache<V>` interface and the `CacheWithExpiry<V>` that extends upon the `Cache<V>`
+There are currently two main sections of interface types:  Observable and NonObservable.   Observable is the support for
+RxJava.
+
+The observerable interface is `ObservableCache<V extends Serializable>` and the implementations:
+
+- `SpyObservableMemcachedCache<V extends Serializable>`
+- `ElastiCacheObservableMemcachedCache<V extends Serializable>`
+
+
+The non-observable interface is as follows.  There are currently two types of Cache interface. `Cache<V>` interface and
+the `CacheWithExpiry<V>` that extends upon the `Cache<V>`.
+
 The two implementation's of the `CacheWithExpiry<V>`.
 
 - `SpyMemcachedCache<V>`
 - `ElastiCacheMemcachedCache<V>`
+
 
 The are a couple of implementations of the `Cache<V>` interface.  However, these are deprecated and will not be discussed
 further:
@@ -64,7 +173,21 @@ further:
 - `SimpleLastRecentlyUsedCache<V>`
 - `ExpiringLastRecentlyUsedCache<V>`
 
+'''
 
+= Observable
+
+This is new as of 2.0.0, and is an implementation of herd cache using RxJava.
+
+== RxJava Support
+
+
+
+'''
+
+= Non Observable
+
+This is using traditional futures, and the original implementation of herdcache.
 
 == `Cache` Interface
 
@@ -223,8 +346,6 @@ The `CacheWithExpiry<V>` interface differs from that of the `Cache<V>`, by havin
 This allows you to specify the duration (length of time) that the item lives in the cache.
 
 
-
-
 '''
 
 = Defaults
@@ -268,7 +389,9 @@ map first and then set the future value |
 |metricRecorder | no metric recorder | Can take a new `YammerMetricsRecorder` that will record metrics in a CodeHale Metric Registry |
 |compressionAlgorithm | SNAPPY | The type of compression algorithm to use when values are stored in memcached. LZ4 is the quickest implementation |
 |herdProtectionEnabled| true | If you which to turn off herd cache protection |
+|setKeyValidationType| BY_HASHING_TYPE | If you which to turn off validation of your keys, as you know they conform (KeyValidationType.NONE) |
 |=========================================================
+
 
 The following default apply just to that of ElastiCache memcached
 

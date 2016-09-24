@@ -2,6 +2,7 @@ package org.greencheek.caching.herdcache.memcached.config.builder;
 
 import net.spy.memcached.*;
 import net.spy.memcached.transcoders.Transcoder;
+import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.CommaSeparatedHostAndPortStringParser;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
@@ -60,6 +61,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private boolean herdProtectionEnabled = true;
 
     private Scheduler waitForMemcachedSetRxScheduler = Schedulers.io();
+    private KeyValidationType keyValidationType = KeyValidationType.BY_HASHING_TYPE;
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -81,7 +83,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                metricRecorder,
                locatorFactory,
                herdProtectionEnabled,
-               waitForMemcachedSetRxScheduler);
+               waitForMemcachedSetRxScheduler,
+               keyValidationType);
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -269,6 +272,11 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setWaitForMemcachedSetRxScheduler(Scheduler waitForMemcachedSetRxScheduler) {
         this.waitForMemcachedSetRxScheduler = waitForMemcachedSetRxScheduler;
+        return self();
+    }
+
+    public T setKeyValidationType(KeyValidationType type) {
+        this.keyValidationType = type;
         return self();
     }
 }
