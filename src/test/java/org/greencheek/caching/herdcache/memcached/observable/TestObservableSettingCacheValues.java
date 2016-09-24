@@ -17,6 +17,7 @@ import org.junit.Test;
 import rx.Single;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -268,25 +269,129 @@ public class TestObservableSettingCacheValues {
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
                         .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
                         .buildMemcachedConfig()
+
         );
 
         String value = "value1";
         Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
 
+        CacheItem<String> item1 = val.toBlocking().value();
+        assertEquals("elasticKey1", item1.getKey());
+
+        Single<CacheItem<String>> val2 = cache.set("Key2", () -> value,Duration.ofSeconds(60));
+        assertEquals("elasticKey2", val2.toBlocking().value().getKey());
+
         val.subscribe(item ->
-                assertEquals("Value should be '"+value+"'", value, item.getValue().get()));
+                assertEquals("Value should be '" + value + "'", value, item.getValue().get()));
 
         val = cache.get("Key1");
         String item = val.toBlocking().value().value();
 
         assertNotNull("Value should be 'value1'", item);
 
-        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+        assertEquals(2, memcached.getDaemon().getCache().getCurrentItems());
 
         Single<Boolean> delete = cache.clear("Key1");
         assertNotNull(delete.toBlocking().value().booleanValue());
 
+
+    }
+
+
+    @Test
+    public void testLazyCacheSet() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(false)
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        String value = "value1";
+        Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
+        Single<CacheItem<String>> val2 = cache.apply("Key2", () -> value, Duration.ofSeconds(60));
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        assertEquals(0, memcached.getDaemon().getCache().getCurrentItems());
+    }
+
+    @Test
+    public void testLazyCacheGet() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        String value = "value1";
+        Single<CacheItem<String>> val = cache.set("Key1", () -> value, Duration.ofSeconds(60));
+
+        assertEquals(value, val.toBlocking().value().value());
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+        Single<CacheItem<String>> item = cache.get("Key1");
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals(0, memcached.getDaemon().getCache().getGetCmds());
+
+    }
+
+
+    @Test
+    public void testLazyCacheDelete() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setWaitForRemove(Duration.ofSeconds(5))
+                        .setWaitForRemove(Duration.ofMillis(0))
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .buildMemcachedConfig()
+
+        );
+
+        String value = "value1";
+        Single<CacheItem<String>> val = cache.set("Key1", () -> value, Duration.ofSeconds(60));
+
+        assertEquals(value, val.toBlocking().value().value());
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+        Single<Boolean> item = cache.clear("Key1");
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
 
     }
 

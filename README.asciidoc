@@ -207,15 +207,55 @@ implement this interface, which has the methods:
 All implementations return the RxJava Observable implementation `Single<CacheItem<V>>`.   Which means a single value is
 returned, or a Throwable.
 
-
 The RxJava Support does not implement a "Stale With Revalidate" notion.  The reason being is that this is entirely implementable/customizable
  on the client side.
+
+All of the `Single` observables that are returned by the implementation are Cold Observables.
 
 === CacheItem
 
 The `CacheItem<V>` return type is just a wrapper around your `V` implementation type.   `V` is the object type that is stored/serialised
 to memcached.
 
+The `CacheItem<V>` has a few method to make interacting with teh domain object a little less painful.
+
+For example lets take the cache get: `cache.get(string)` that will eventually return `CacheItem<String>`, all being well.
+
+`CacheItem<String> item = cache.get("string").toBlocking().value()`
+
+The get against memcached might either return a value, or return "null".  Therefore the value returned is wrapped in a `Optional<String>`
+
+- To get the Optional:
+
+`Optional<String> v = item.getValue()`
+`Optional<String> v = item.optional()`
+
+- If you would rather just have the value and check for null:
+
+`String v = item.value()`
+
+- If you want to return a default value, if 'null' was returned:
+
+`String v = item.value("default")`
+
+- If you want to check if nothing was returned:
+
+`item.isEmpty()`
+
+- If you want to check if something was returned:
+
+`item.hasValue()`
+
+- If you want to obtain the key the item is cached under
+
+`item.getKey()`
+
+- If you want to check if the result was from the cache
+
+`item.isFromCache()`
+
+
+'''
 
 === RxJava Write To Memcache (to be aware of)
 
@@ -260,6 +300,21 @@ link:src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExa
 
 
 '''
+
+=== Examples
+
+- Set an item in the cache
+
+````
+Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
+// The above just creates the Observable.  Nothing has happened.  If you do not subscribe
+// The item will never be set in the cache.
+
+
+// Register a subscriber to have the set execute
+String itemSet = val.toBlocking().value().value());
+````
+
 
 = Non Observable
 
