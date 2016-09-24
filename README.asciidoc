@@ -420,7 +420,7 @@ action to the subscribe.  Example:
 
 '''
 
-=== subscribeOn and observeOn
+==== subscribeOn and observeOn
 
 If there ever was a confusing subject for RxJava, this is it.  `subscribeOn` is where the Observable's code will execute.
 `observeOn` is where the Subscribers code will execute.
