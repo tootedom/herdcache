@@ -1,5 +1,6 @@
 = HerdCache
 :toc: macro
+:toclevels: 4
 
 toc::[]
 
