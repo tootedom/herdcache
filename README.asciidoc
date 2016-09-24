@@ -71,7 +71,8 @@ However, you'd still have the chance of a collision.  The best default is `NONE`
 performance.  The reason of chosing a hashing algorithm was to remove the "cache key checking" that the memcached client does
 for each key (MAX_KEY_LENGTH == 250), on any operation.  With a fixed length string, the below was not required:
 
-````
+[source,java]
+----
   public static void validateKey(final String key, final boolean binary) {
     byte[] keyBytes = KeyUtil.getKeyBytes(key);
     int keyLength = keyBytes.length;
@@ -94,32 +95,35 @@ for each key (MAX_KEY_LENGTH == 250), on any operation.  With a fixed length str
     }
 
   }
-````
+----
 
 However, as described we run the risk of "collisions".  Meaning you could get the unexpected.  A value stored under a key
 that you did not expect.
 
 As a result, the default hash changed to:
 
-````
+[source,java]
+----
 KeyHashingType.NONE
-````
+----
 
 The result of this is that no hashing of the key is done.  The string you pass, is what the key is stored under in memcached,
 you need not worry about collisions.
 
 If you want to disable the key checking that is done for each operation, as you know your keys conform. You can set the following:
 
-````
+[source,java]
+----
 .setKeyValidationType(KeyValidationType.NONE)
-````
+----
 
 This disables the previously mentioned key validation.  If you do have a key that doesn't conform, you will see messages
 like the following in your logs:
 
-````
+[source,java]
+----
 2016-09-24 12:36:11.176 ERROR net.spy.memcached.protocol.ascii.StoreOperationImpl:  Error:  CLIENT_ERROR bad command line format
-````
+----
 
 '''
 
@@ -283,9 +287,10 @@ When setting `MemcachedCacheConfigBuilder.setWaitForMemcachedSet(false)` you nee
 memcached write to complete in, which is 2 seconds.   If you which to increase this set
 `MemcachedCacheConfigBuilder.setWaitDuration(Duration d)` to something larger.  For example:
 
-````
+[source,java]
+----
 .setWaitDuration(Duration.ofSeconds(5))
-````
+----
 
 === What about Stale While Revalidate
 
@@ -305,7 +310,8 @@ link:src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExa
 
 - Set an item in the cache
 
-````
+[source,java]
+----
 Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds(60));
 // The above just creates the Observable.  Nothing has happened.  If you do not subscribe
 // The item will never be set in the cache.
@@ -313,7 +319,7 @@ Single<CacheItem<String>> val = cache.set("Key1", () -> value,Duration.ofSeconds
 
 // Register a subscriber to have the set execute
 String itemSet = val.toBlocking().value().value());
-````
+----
 
 
 = Non Observable
