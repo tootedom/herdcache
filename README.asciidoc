@@ -308,7 +308,7 @@ link:src/test/java/org/greencheek/caching/herdcache/memcached/observable/TestExa
 
 === Examples
 
-- Set an item in the cache
+==== Set an item in the cache
 
 [source,java]
 ----
@@ -321,7 +321,7 @@ Single<CacheItem<String>> val = cache.set("Key1", () -> "SomeValue",Duration.ofS
 String itemSet = val.toBlocking().value().value());
 ----
 
-- Get Or Set an item in the cache
+==== Get Or Set an item in the cache
 
 If "Key1" already exists in the cache then it is returned.  Otherwise the new value is returned, and set in the cache
 
@@ -337,7 +337,7 @@ String itemSet = val.toBlocking().value().value());
 ----
 
 
-- Get an item from the cache
+==== Get an item from the cache
 
 [source,java]
 ----
@@ -350,6 +350,7 @@ Single<CacheItem<String>> val = cache.get("Key1")
 String item = val.toBlocking().value().value());
 ----
 
+==== Runtime Exceptions from `Supplier<V>`
 
 In all of the above examples, we assume no Runtime Exceptions occur, when the value is obtained from the `Supplier<V>`
 (from `set(...)` and `apply(...)`).  If the Supplier throws an exception they will be propagated to the Subscriber.
@@ -414,6 +415,8 @@ action to the subscribe.  Example:
         assertFalse("should have thrown an exception",success.get());
         assertTrue("should have thrown custom exception", failure.get());
     }
+
+
 
 ----
 
