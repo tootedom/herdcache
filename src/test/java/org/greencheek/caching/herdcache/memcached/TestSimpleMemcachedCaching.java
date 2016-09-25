@@ -1459,7 +1459,7 @@ public class TestSimpleMemcachedCaching {
         MetricRegistry registry = new MetricRegistry();
 
         Predicate<String> cachedValueAllowed = (String value) -> {
-            return value.equals("cacheable");
+            return value.equals("non_cacheable");
         };
 
         cache = new SpyMemcachedCache<>(
