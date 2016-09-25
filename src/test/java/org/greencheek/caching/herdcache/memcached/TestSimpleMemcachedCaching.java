@@ -1465,7 +1465,7 @@ public class TestSimpleMemcachedCaching {
         cache = new SpyMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setTimeToLive(Duration.ofSeconds(300))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
                         .setKeyHashType(KeyHashingType.SHA256_UPPER)
