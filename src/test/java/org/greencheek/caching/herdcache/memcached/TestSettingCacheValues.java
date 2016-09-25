@@ -20,6 +20,8 @@ import org.junit.Test;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
@@ -82,6 +84,58 @@ public class TestSettingCacheValues {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testSetKeyAndValueManyTimes() {
+
+        ScheduledExecutorService server = Executors.newSingleThreadScheduledExecutor();
+
+        cache = new SpyMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(300))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .buildMemcachedConfig()
+        );
+
+        server.schedule(() -> {
+            memcached.getDaemon().stop();
+        },1000, TimeUnit.MILLISECONDS);
+
+        server.schedule(() -> {
+            memcached.getDaemon().stop();
+        },10000, TimeUnit.MILLISECONDS);
+
+
+
+        server.schedule(() -> {
+            memcached.getDaemon().start();
+        },5000, TimeUnit.MILLISECONDS);
+
+        server.schedule(() -> {
+            memcached.getDaemon().start();
+        },20000, TimeUnit.MILLISECONDS);
+
+
+
+        ListenableFuture<String> val = cache.set("Key1", "value1");
+        assertEquals("Value should be 'value1'", "value1", cache.awaitForFutureOrElse(val, null));
+
+
+        for (int i=0;i<1000;i++) {
+            try {
+                ListenableFuture<String> val5 = cache.get("Key1", executorService);
+                String v = cache.awaitForFutureOrElse(val5, null);
+                assertTrue("Value should be 'value1'", v==null || "value1".equals(v));
+                Thread.sleep(50);
+//                assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     @Test

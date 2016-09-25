@@ -1532,9 +1532,7 @@ public class TestSimpleMemcachedCaching {
         MetricRegistry registry = new MetricRegistry();
 
         Predicate<Content> cachedValueAllowed  = (Content value) ->
-             value.getCreationDateEpoch() + System.currentTimeMillis() < 500;
-
-
+                System.currentTimeMillis() - value.getCreationDateEpoch() < 500;
 
         cache = new SpyMemcachedCache<Content>(
                 new ElastiCacheCacheConfigBuilder()
@@ -1564,6 +1562,12 @@ public class TestSimpleMemcachedCaching {
 
 
             assertEquals("Value should be key1", "not_cacheable", ((Content) cache.awaitForFutureOrElse(val, null)).getContent());
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             ListenableFuture<Content> val2 = cache.apply("Key1", () -> {
                 try {
