@@ -193,6 +193,7 @@ public class TestMultipleForceConfigReconnection {
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                             .setWaitForMemcachedSet(true)
                             .setHashAlgorithm(algo)
+                            .setMemcachedGetTimeout(Duration.ofMillis(100))
                             .setDelayBeforeClientClose(Duration.ofSeconds(1))
                             .setDnsConnectionTimeout(Duration.ofSeconds(2))
                             .setUseStaleCache(true)
