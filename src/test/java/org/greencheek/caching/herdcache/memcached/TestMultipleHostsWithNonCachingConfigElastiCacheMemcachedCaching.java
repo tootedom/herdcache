@@ -210,15 +210,16 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
         };
 
         StringServer server = new StringServer(configurationsMessage, 0, TimeUnit.SECONDS);
-        server.before(configurationsMessage, TimeUnit.SECONDS, -1, false);
-
-        final AtomicInteger latch = new AtomicInteger(1);
-
-        ClientClusterUpdateObserver observer = (updated) -> {
-            latch.decrementAndGet();
-        };
 
         try {
+            server.before(configurationsMessage, TimeUnit.SECONDS, -1, false);
+
+            final AtomicInteger latch = new AtomicInteger(1);
+
+            ClientClusterUpdateObserver observer = (updated) -> {
+                latch.decrementAndGet();
+            };
+
             cache = createCache(server.getPort(),algo,observer);
 
 

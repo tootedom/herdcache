@@ -212,43 +212,47 @@ public class PeriodicConfigRetrievalClientTest {
     public void testUpdateConfiguration() {
 
         ScheduledExecutorService sexec = Executors.newSingleThreadScheduledExecutor();
-        ConfigRetrievalSettingsBuilder builder = new ConfigRetrievalSettingsBuilder();
-        final CountDownLatch latch = new CountDownLatch(7);
-        final AtomicInteger invalid = new AtomicInteger(0);
-        ConfigInfoProcessor processor = new ConfigInfoProcessor() {
-            @Override
-            public void processConfig(ConfigInfo info) {
-                System.out.println(info);
-                latch.countDown();
-                if(!info.isValid()) invalid.incrementAndGet();
-            }
-        };
-
-        final ElastiCacheConfigServerUpdater configUpdator = new SimpleVolatileBasedElastiCacheConfigServerUpdater();
-
-        builder.setConfigInfoProcessor(processor);
-        builder.setConfigPollingTime(0,2, TimeUnit.SECONDS);
-        builder.setIdleReadTimeout(70, TimeUnit.SECONDS);
-        builder.setReconnectDelay(1000,TimeUnit.MILLISECONDS);
-        builder.addElastiCacheHost(new ElastiCacheServerConnectionDetails("localhost",server.getPort()));
-        builder.setNumberOfInvalidConfigsBeforeReconnect(10);
-        builder.setConfigUrlUpdater(Optional.of(configUpdator));
-
-        client = new PeriodicConfigRetrievalClient(builder.build());
-        client.start();
-
-        boolean ok=false;
         try {
-            sexec.scheduleWithFixedDelay(()->{
-                configUpdator.connectionUpdated("localhost:"+server.getPort());
-            },0,11,TimeUnit.SECONDS);
-            ok = latch.await(30, TimeUnit.SECONDS);
-        } catch(InterruptedException e) {
-            fail("problem waiting for config retrieval");
-        }
+            ConfigRetrievalSettingsBuilder builder = new ConfigRetrievalSettingsBuilder();
+            final CountDownLatch latch = new CountDownLatch(7);
+            final AtomicInteger invalid = new AtomicInteger(0);
+            ConfigInfoProcessor processor = new ConfigInfoProcessor() {
+                @Override
+                public void processConfig(ConfigInfo info) {
+                    System.out.println(info);
+                    latch.countDown();
+                    if (!info.isValid()) invalid.incrementAndGet();
+                }
+            };
 
-        assertTrue(ok);
-        assertEquals(7,invalid.get());
+            final ElastiCacheConfigServerUpdater configUpdator = new SimpleVolatileBasedElastiCacheConfigServerUpdater();
+
+            builder.setConfigInfoProcessor(processor);
+            builder.setConfigPollingTime(0, 2, TimeUnit.SECONDS);
+            builder.setIdleReadTimeout(70, TimeUnit.SECONDS);
+            builder.setReconnectDelay(1000, TimeUnit.MILLISECONDS);
+            builder.addElastiCacheHost(new ElastiCacheServerConnectionDetails("localhost", server.getPort()));
+            builder.setNumberOfInvalidConfigsBeforeReconnect(10);
+            builder.setConfigUrlUpdater(Optional.of(configUpdator));
+
+            client = new PeriodicConfigRetrievalClient(builder.build());
+            client.start();
+
+            boolean ok = false;
+            try {
+                sexec.scheduleWithFixedDelay(() -> {
+                    configUpdator.connectionUpdated("localhost:" + server.getPort());
+                }, 0, 11, TimeUnit.SECONDS);
+                ok = latch.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                fail("problem waiting for config retrieval");
+            }
+
+            assertTrue(ok);
+            assertEquals(7, invalid.get());
+        } finally {
+            sexec.shutdownNow();
+        }
     }
 
     @Test

@@ -160,7 +160,6 @@ public class TestMultipleForceConfigReconnection {
 
     private void testHashAlgorithm(HashAlgorithm algo) {
 
-        ScheduledExecutorService sexec = Executors.newSingleThreadScheduledExecutor();
 
         String[] configurationsMessage1 = new String[]{
                 "CONFIG cluster 0 147\r\n" + "1\r\n" + "localhost|127.0.0.1|" + memcached1.getPort() + "\r\n" + "\nEND\r\n"
@@ -171,24 +170,26 @@ public class TestMultipleForceConfigReconnection {
         };
 
         StringServer configServer1 = new StringServer(configurationsMessage1, 0, TimeUnit.SECONDS);
-        configServer1.before(configurationsMessage1, TimeUnit.SECONDS, -1, false);
-
 
         StringServer configServer2 = new StringServer(configurationsMessage2, 0, TimeUnit.SECONDS);
-        configServer2.before(configurationsMessage2, TimeUnit.SECONDS, -1, false);
 
         ElastiCacheConfigServerUpdater configServerUpdater = new SimpleVolatileBasedElastiCacheConfigServerUpdater();
 
-        String[] urls = new String[]{"localhost:"+configServer1.getPort(),"localhost:"+configServer2.getPort()};
 
+        ScheduledExecutorService sexec = Executors.newSingleThreadScheduledExecutor();
 
         try {
+            configServer1.before(configurationsMessage1, TimeUnit.SECONDS, -1, false);
+            configServer2.before(configurationsMessage2, TimeUnit.SECONDS, -1, false);
+            String[] urls = new String[]{"localhost:"+configServer1.getPort(),"localhost:"+configServer2.getPort()};
+
+
             cache = new ElastiCacheMemcachedCache<String>(
                     new ElastiCacheCacheConfigBuilder()
                             .setElastiCacheConfigHosts("localhost:" + configServer1.getPort())
-                            .setConfigPollingTime(Duration.ofSeconds(10))
+                            .setConfigPollingTime(Duration.ofSeconds(5))
                             .setInitialConfigPollingDelay(Duration.ofSeconds(0))
-                            .setTimeToLive(Duration.ofSeconds(5))
+                            .setTimeToLive(Duration.ofSeconds(10))
                             .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                             .setWaitForMemcachedSet(true)
                             .setHashAlgorithm(algo)
@@ -231,7 +232,7 @@ public class TestMultipleForceConfigReconnection {
                 testCaching(cache);
             }
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>1);
-            assertTrue(memcached2.getDaemon().getCache().getCurrentItems()>1);
+            assertTrue(memcached2.getDaemon().getCache().getCurrentItems()>=1);
 
         }
         finally {
@@ -240,6 +241,7 @@ public class TestMultipleForceConfigReconnection {
             if(cache instanceof RequiresShutdown) {
                 ((RequiresShutdown)cache).shutdown();
             }
+            sexec.shutdownNow();
         }
 
     }
