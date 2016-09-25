@@ -165,7 +165,7 @@ public class TestMultipleHostsWithNonCachingConfigElastiCacheMemcachedCaching {
 
 
         Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(100);
-        for(int i=0;i<100;i++) {
+        for(int i=0;i<20;i++) {
             final String uuidKey = UUID.randomUUID().toString();
             cacheWrites.put(uuidKey, cache.apply(uuidKey, () -> {
                 return uuidKey;

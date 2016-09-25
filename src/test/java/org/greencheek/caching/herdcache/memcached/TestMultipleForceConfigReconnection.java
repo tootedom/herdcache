@@ -145,7 +145,7 @@ public class TestMultipleForceConfigReconnection {
 
 
         Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(200);
-        for(int i=0;i<200;i++) {
+        for(int i=0;i<10;i++) {
             final String uuidKey = UUID.randomUUID().toString();
             cacheWrites.put(uuidKey, cache.apply(uuidKey, () -> {
                 return uuidKey;
@@ -183,6 +183,11 @@ public class TestMultipleForceConfigReconnection {
             configServer2.before(configurationsMessage2, TimeUnit.SECONDS, -1, false);
             String[] urls = new String[]{"localhost:"+configServer1.getPort(),"localhost:"+configServer2.getPort()};
 
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             cache = new ElastiCacheMemcachedCache<String>(
                     new ElastiCacheCacheConfigBuilder()
@@ -216,12 +221,12 @@ public class TestMultipleForceConfigReconnection {
                 e.printStackTrace();
             }
 
-            for(int i =0;i<100;i++) {
+            for(int i =0;i<10;i++) {
                 testCaching(cache);
             }
 
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>=1);
-            for(int i =0;i<100;i++) {
+            for(int i =0;i<10;i++) {
                 testCaching(cache);
             }
             try {
@@ -229,7 +234,7 @@ public class TestMultipleForceConfigReconnection {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            for(int i =0;i<100;i++) {
+            for(int i =0;i<10;i++) {
                 testCaching(cache);
             }
             assertTrue(memcached1.getDaemon().getCache().getCurrentItems()>1);

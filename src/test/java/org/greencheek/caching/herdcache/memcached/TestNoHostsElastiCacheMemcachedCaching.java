@@ -228,7 +228,7 @@ public class TestNoHostsElastiCacheMemcachedCaching {
 
 
         Map<String,ListenableFuture<String>> cacheWrites = new HashMap<>(200);
-        for(int i=0;i<200;i++) {
+        for(int i=0;i<20;i++) {
             final String uuidKey = UUID.randomUUID().toString();
             cacheWrites.put(uuidKey, cache.apply(uuidKey, () -> {
                 return uuidKey;
