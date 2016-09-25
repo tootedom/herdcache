@@ -1469,6 +1469,7 @@ public class TestSimpleMemcachedCaching {
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
                         .setWaitForMemcachedSet(true)
                         .setKeyHashType(KeyHashingType.SHA256_UPPER)
+                        .setRemoveFutureFromInternalCacheBeforeSettingValue(true)
                         .setMetricsRecorder(new YammerMetricsRecorder(registry))
                         .buildMemcachedConfig()
         );

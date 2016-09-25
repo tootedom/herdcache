@@ -52,7 +52,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private String staleCachePrefix = "stale";
     private int staleMaxCapacity = -1;
     private Duration staleCacheMemachedGetTimeout = Duration.ZERO;
-    private boolean removeFutureFromInternalCacheBeforeSettingValue = false;
+    private boolean removeFutureFromInternalCacheBeforeSettingValue = true;
     private boolean hashKeyPrefix = true;
     private Duration waitForRemove = Duration.ZERO;
     private MetricRecorder metricRecorder = new NoOpMetricRecorder();
