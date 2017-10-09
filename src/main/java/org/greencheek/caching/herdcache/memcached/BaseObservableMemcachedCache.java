@@ -23,6 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Single;
 import rx.SingleSubscriber;
+import rx.functions.Action1;
+import rx.functions.Actions;
 import rx.schedulers.Schedulers;
 
 import java.io.Serializable;
@@ -57,7 +59,6 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
     private final CacheRead<V> cacheReader;
     private static final Logger logger  = LoggerFactory.getLogger(BaseObservableMemcachedCache.class);
 
-
     private final MemcachedCacheConfig config;
     private final MemcachedClientFactory clientFactory;
     private final ConcurrentMap<String,Single<CacheItem<V>>> store;
@@ -71,8 +72,6 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
     private final CacheKeyCreator cacheKeyCreator;
     private final long millisToWaitForDelete;
     private final boolean waitForMemcachedSet;
-
-
 
     public BaseObservableMemcachedCache(
             MemcachedClientFactory clientFactory,
@@ -113,6 +112,14 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
     }
 
 
+    public static final void logMemcachedWriteError(Throwable t) {
+        if(t instanceof RejectedExecutionException) {
+            logger.warn("Scheduler rejected execution.",t);
+        }
+        else {
+            logger.warn("Unexpected Exception occurred during memcached write on Scheduler.",t);
+        }
+    }
 
     private void warnCacheDisabled() {
         logger.warn("Cache is disabled");
@@ -309,44 +316,21 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
             CacheItem<V> cacheItem = new CacheItem<>(keyString,results,false);
 
             if(waitForMemcachedSet) {
-
-                try {
                     writeToCache(client, cacheItem, keyString,
                             DurationToSeconds.getSeconds(timeToLive),
                             canCacheValueEvalutor)
                             .subscribeOn(Schedulers.immediate())
-                            .subscribe();
-                }
-
-                catch (RejectedExecutionException e) {
-                    logger.warn("Scheduler rejected execution", e);
-                }
-
-                catch (Exception e) {
-                    logger.error("Some wholly unforeseen error condition occurred," +
-                            " chomping it so your cache can continue operating", e);
-                }
+                            .subscribe(Actions.empty(),BaseObservableMemcachedCache::logMemcachedWriteError);
 
                 notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
             } else {
                 notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
 
-                try {
-                    writeToCache(client, cacheItem, keyString,
-                            DurationToSeconds.getSeconds(timeToLive),
-                            canCacheValueEvalutor)
-                            .subscribeOn(config.getWaitForMemcachedSetRxScheduler())
-                            .subscribe();
-                }
-
-                catch (RejectedExecutionException e) {
-                    logger.warn("Scheduler rejected execution", e);
-                }
-
-                catch (Exception e) {
-                    logger.error("Some wholly unforeseen error condition occurred," +
-                            " chomping it so your cache can continue operating", e);
-                }
+                writeToCache(client, cacheItem, keyString,
+                        DurationToSeconds.getSeconds(timeToLive),
+                        canCacheValueEvalutor)
+                        .subscribeOn(config.getWaitForMemcachedSetRxScheduler())
+                        .subscribe(Actions.empty(),BaseObservableMemcachedCache::logMemcachedWriteError);
 
             }
         }

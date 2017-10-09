@@ -11,19 +11,22 @@ import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonFactory;
 import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
+import org.greencheek.caching.herdcache.util.EmptyBlockingQueue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import rx.Scheduler;
 import rx.Single;
 import rx.functions.Action1;
+import rx.plugins.RxJavaHooks;
 import rx.schedulers.Schedulers;
 
 import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
+import java.util.Queue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
@@ -539,28 +542,97 @@ public class TestObservableSettingCacheValues {
     }
 
     @Test
-    public void testErrorScheduler() {
+    public void testErrorOnMemcachedWriteProvidedScheduler() {
+
+
+        ThreadPoolExecutor p = new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new EmptyBlockingQueue(),
+                new ThreadPoolExecutor.AbortPolicy());
 
         cache = new SpyObservableMemcachedCache<>(
                 new ElastiCacheCacheConfigBuilder()
                         .setMemcachedHosts("localhost:" + memcached.getPort())
-                        .setWaitForMemcachedSetRxScheduler(new Scheduler() {
-                            @Override
-                            public Worker createWorker() {
-                                throw new RuntimeException();
-                            }
-                        })
+                        .setWaitForMemcachedSetRxScheduler(Schedulers.from(p))
                         .setWaitForMemcachedSet(false)
                         .setTimeToLive(Duration.ofSeconds(10))
                         .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
-                        .setWaitForMemcachedSet(false)
                         .setKeyValidationType(KeyValidationType.ALWAYS)
                         .buildMemcachedConfig()
         );
 
-        CacheItem<String> val = cache.set("Key1", "value1",Duration.ZERO).toBlocking().value();
+        AtomicBoolean keepRunning = new AtomicBoolean(true);
+
+        p.execute(new Runnable() {
+            @Override
+            public void run() {
+                while(keepRunning.get()){
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        CacheItem<String> val = cache.set("Key1", "value1", Duration.ZERO).toBlocking().value();
+        keepRunning.set(false);
 
         // No need to assert anything, an unhandled scheduling exception will fail this test for us :)
+    }
+
+    @Test
+    public void testErrorOnMemcachedWriteScheduler() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setWaitForMemcachedSet(false)
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setKeyValidationType(KeyValidationType.ALWAYS)
+                        .buildMemcachedConfig()
+        );
+
+        ThreadPoolExecutor ex = new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new EmptyBlockingQueue(),
+                new ThreadPoolExecutor.AbortPolicy());
+
+        Scheduler sh = Schedulers.from(ex);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicInteger error = new AtomicInteger(0);
+
+        RxJavaHooks.setOnError((t) -> {
+            latch.countDown();
+            error.incrementAndGet();
+        });
+
+        cache.set("Key1", "value1",Duration.ZERO).subscribeOn(sh).observeOn(sh).subscribe((val) -> {
+            System.out.println(val);
+            latch.countDown();
+        },(t) -> {
+            latch.countDown();
+            error.incrementAndGet();
+        });
+
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        assertEquals(1,error.get());
+
     }
 
 
