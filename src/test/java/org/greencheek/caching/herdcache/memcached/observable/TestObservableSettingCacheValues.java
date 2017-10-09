@@ -14,6 +14,7 @@ import org.greencheek.caching.herdcache.memcached.util.MemcachedDaemonWrapper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Scheduler;
 import rx.Single;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
@@ -536,6 +537,32 @@ public class TestObservableSettingCacheValues {
 
         assertTrue("should have errored",hasErrored.get());
     }
+
+    @Test
+    public void testErrorScheduler() {
+
+        cache = new SpyObservableMemcachedCache<>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setWaitForMemcachedSetRxScheduler(new Scheduler() {
+                            @Override
+                            public Worker createWorker() {
+                                throw new RuntimeException();
+                            }
+                        })
+                        .setWaitForMemcachedSet(false)
+                        .setTimeToLive(Duration.ofSeconds(10))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(false)
+                        .setKeyValidationType(KeyValidationType.ALWAYS)
+                        .buildMemcachedConfig()
+        );
+
+        CacheItem<String> val = cache.set("Key1", "value1",Duration.ZERO).toBlocking().value();
+
+        // No need to assert anything, an unhandled scheduling exception will fail this test for us :)
+    }
+
 
 
     @Test

@@ -309,19 +309,45 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
             CacheItem<V> cacheItem = new CacheItem<>(keyString,results,false);
 
             if(waitForMemcachedSet) {
-                Single<CacheItem<V>> write = writeToCache(client, cacheItem, keyString,
-                        DurationToSeconds.getSeconds(timeToLive),
-                        canCacheValueEvalutor);
-                write.subscribeOn(Schedulers.immediate()).subscribe();
+
+                try {
+                    writeToCache(client, cacheItem, keyString,
+                            DurationToSeconds.getSeconds(timeToLive),
+                            canCacheValueEvalutor)
+                            .subscribeOn(Schedulers.immediate())
+                            .subscribe();
+                }
+
+                catch (RejectedExecutionException e) {
+                    logger.warn("Scheduler rejected execution", e);
+                }
+
+                catch (Exception e) {
+                    logger.error("Some wholly unforeseen error condition occurred," +
+                            " chomping it so your cache can continue operating", e);
+                }
 
                 notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
             } else {
                 notifySubscriberOnSuccess(keyString,cacheItem,singleSubscriber,store);
 
-                Single<CacheItem<V>> write = writeToCache(client, cacheItem, keyString,
-                        DurationToSeconds.getSeconds(timeToLive),
-                        canCacheValueEvalutor);
-                write.subscribeOn(config.getWaitForMemcachedSetRxScheduler()).subscribe();
+                try {
+                    writeToCache(client, cacheItem, keyString,
+                            DurationToSeconds.getSeconds(timeToLive),
+                            canCacheValueEvalutor)
+                            .subscribeOn(config.getWaitForMemcachedSetRxScheduler())
+                            .subscribe();
+                }
+
+                catch (RejectedExecutionException e) {
+                    logger.warn("Scheduler rejected execution", e);
+                }
+
+                catch (Exception e) {
+                    logger.error("Some wholly unforeseen error condition occurred," +
+                            " chomping it so your cache can continue operating", e);
+                }
+
             }
         }
     }
