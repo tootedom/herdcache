@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  */
 public class BackgroundDnsResolver implements ReferencedClientHolder {
     private static final Logger LOG = LoggerFactory.getLogger(BackgroundDnsResolver.class);
-    private static Holder EMPTY = new Holder(SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT,new InetAddress[0]);
+    private static final Holder EMPTY = new Holder(SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT,new InetAddress[0]);
 
     private final AtomicReference<Holder> client = new AtomicReference(EMPTY);
 
