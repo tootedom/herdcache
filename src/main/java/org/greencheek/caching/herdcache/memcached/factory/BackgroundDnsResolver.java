@@ -14,10 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -56,45 +53,52 @@ public class BackgroundDnsResolver implements ReferencedClientHolder {
                                  ReferencedClientFactory connnectionFactory, AddressResolver resolver) {
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(DEFAULT_THREAD_FACTORY);
         this.host = host;
-
-
-        scheduledExecutorService.scheduleWithFixedDelay(
-                backgroundResolver(),
-                0,backgroundPollingTimeInMillis,
-                TimeUnit.MILLISECONDS);
-
-
         this.connnectionFactory = connnectionFactory;
         this.resolver = resolver;
+
+        ScheduledFuture f=  scheduledExecutorService.scheduleWithFixedDelay(
+                backgroundResolver(resolver,connnectionFactory,host),
+                0, backgroundPollingTimeInMillis,
+                TimeUnit.MILLISECONDS);
+
     }
 
-    private Runnable backgroundResolver() {
+    private Runnable backgroundResolver(final AddressResolver resolver, final ReferencedClientFactory connnectionFactory,
+                                        final Host host ) {
         return () -> {
-            String hostName = host.getHost();
-            Holder currentResolvedAddresses = client.get();
-            InetAddress[] addresses = resolver.resolve(hostName);
+            try {
+                String hostName = host.getHost();
+                Holder currentResolvedAddresses = client.get();
+                InetAddress[] addresses = resolver.resolve(hostName);
 
-            addresses = checkForCollisionResponses(addresses, hostName);
 
-            InetAddress[] existingAddresses = currentResolvedAddresses.addresses;
+                addresses = checkForCollisionResponses(addresses, hostName);
 
-            if(addresses.length == 0) {
-                if(existingAddresses.length==0) {
-                    LOG.error("Failed to resolve address for '{}', no pre-cached addresses to re-use", host);
-                } else {
-                    LOG.error("Failed to resolve address for '{}', old pre-cached addresses will be kept",host);
-                }
-            } else {
-                if (haveAddressesChanged(addresses,existingAddresses)) {
-                    ReferencedClient referencedClient = connnectionFactory.createClient(toSocketAddresses(addresses));
-                    if (referencedClient != SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT) {
-                        client.set(new Holder(referencedClient,addresses));
+                InetAddress[] existingAddresses = currentResolvedAddresses.addresses;
+
+                if (addresses.length == 0) {
+                    if (existingAddresses.length == 0) {
+                        LOG.error("Failed to resolve address for '{}', no pre-cached addresses to re-use", host.getHost());
+                    } else {
+                        LOG.error("Failed to resolve address for '{}', old pre-cached addresses will be kept", host.getHost());
                     }
-                    LOG.debug("[{}] Addresses available: {}", host, toCommaSeparated(addresses));
                 } else {
-                    LOG.debug("[{}] Has Same Addresses: {}", host, toCommaSeparated(addresses));
+                    if (haveAddressesChanged(addresses, existingAddresses)) {
+                        ReferencedClient referencedClient = connnectionFactory.createClient(toSocketAddresses(addresses));
+                        if (referencedClient != SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT) {
+                            client.set(new Holder(referencedClient, addresses));
+                        }
+                        LOG.debug("[{}] Addresses available: {}", host, toCommaSeparated(addresses));
+                    } else {
+                        LOG.debug("[{}] Has Same Addresses: {}", host, toCommaSeparated(addresses));
+                    }
                 }
+            } catch(Exception e) {
+                LOG.error("Exception Encountered During Background DNS Resolver.  Caught Error so as to not stop further executions.  Investigation in cause suggested.",e);
             }
+
+
+
         };
     }
 

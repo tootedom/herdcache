@@ -13,6 +13,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
@@ -24,6 +26,7 @@ public class BackgroundDnsResolverTest {
 
 
     class SimpleCircularAddressResolver implements AddressResolver{
+        private final CountDownLatch startSignal = new CountDownLatch(1);
         private AtomicInteger called = new AtomicInteger(0);
         private final InetAddress[][] addresses;
 
@@ -33,11 +36,16 @@ public class BackgroundDnsResolverTest {
 
         @Override
         public InetAddress[] resolve(String host) {
+            startSignal.countDown();
             if(called.get()==addresses.length) {
                 called.set(0);
             }
 
             return addresses[called.getAndIncrement()];
+        }
+
+        public CountDownLatch getStartSignal() {
+            return startSignal;
         }
     }
 
@@ -74,8 +82,11 @@ public class BackgroundDnsResolverTest {
         addresses3[1] = InetAddress.getByName("127.0.0.2");
         addresses3[2] = InetAddress.getByName("127.0.0.3");
 
-        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2,addresses3}));
+        SimpleCircularAddressResolver addressResolver = new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2,addresses3});
+        CountDownLatch latch = addressResolver.getStartSignal();
+        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,addressResolver);
         try {
+            latch.await(10000, TimeUnit.SECONDS);
             Thread.sleep(2000);
             ReferencedClient client = resolver.getClient();
             assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
@@ -112,8 +123,11 @@ public class BackgroundDnsResolverTest {
         addresses3[1] = InetAddress.getByName("127.0.53.53");
         addresses3[2] = InetAddress.getByName("127.0.53.53");
 
-        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2,addresses3}));
+        SimpleCircularAddressResolver addressResolver = new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2,addresses3});
+        CountDownLatch latch = addressResolver.getStartSignal();
+        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,addressResolver);
         try {
+            latch.await(10000, TimeUnit.SECONDS);
             Thread.sleep(2000);
             ReferencedClient client = resolver.getClient();
             assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
@@ -147,10 +161,12 @@ public class BackgroundDnsResolverTest {
         addresses2[2] = InetAddress.getByName("127.0.0.5");
 
 
-
-        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2}));
+        SimpleCircularAddressResolver addressResolver = new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2});
+        CountDownLatch latch = addressResolver.getStartSignal();
+        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,addressResolver);
         try {
-            Thread.sleep(5000);
+            latch.await(10000, TimeUnit.SECONDS);
+            Thread.sleep(2000);
             ReferencedClient client = resolver.getClient();
             assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
             Thread.sleep(13000);
