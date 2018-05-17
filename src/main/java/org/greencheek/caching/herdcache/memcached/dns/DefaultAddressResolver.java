@@ -13,9 +13,6 @@ import java.util.List;
  * Default {@link AddressResolver} that defers to the {@link InetAddress#getAllByName(String)} method for address
  * resolution.
  *
- * If the DNS resolver returns 127.0.53.53 (https://www.icann.org/resources/pages/name-collision-2013-12-06-en),
- * then it is ignored from the list of returned addresses.
- *
  * If there are no addresses, then an Array with 0 elements is returned.
  */
 public class DefaultAddressResolver implements AddressResolver {

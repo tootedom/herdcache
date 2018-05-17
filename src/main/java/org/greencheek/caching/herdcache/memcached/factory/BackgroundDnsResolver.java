@@ -23,6 +23,9 @@ import java.util.stream.Collectors;
 
 /**
  * Created by dominictootell on 17/05/2018.
+ *
+ * If the DNS resolver returns 127.0.53.53 (https://www.icann.org/resources/pages/name-collision-2013-12-06-en),
+ * then it is ignored from the list of returned addresses.
  */
 public class BackgroundDnsResolver implements ReferencedClientHolder {
     private static final Logger LOG = LoggerFactory.getLogger(BackgroundDnsResolver.class);
@@ -76,9 +79,10 @@ public class BackgroundDnsResolver implements ReferencedClientHolder {
             InetAddress[] existingAddresses = currentResolvedAddresses.addresses;
 
             if(addresses.length == 0) {
-
                 if(existingAddresses.length==0) {
                     LOG.error("Failed to resolve address for '{}', no pre-cached addresses to re-use", host);
+                } else {
+                    LOG.error("Failed to resolve address for '{}', old pre-cached addresses will be kept",host);
                 }
             } else {
                 if (haveAddressesChanged(addresses,existingAddresses)) {
