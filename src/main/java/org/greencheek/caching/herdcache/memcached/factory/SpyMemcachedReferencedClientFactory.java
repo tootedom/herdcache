@@ -21,7 +21,7 @@ public class SpyMemcachedReferencedClientFactory<V> implements ReferencedClientF
     @Override
     public ReferencedClient createClient(List<InetSocketAddress> resolvedHosts) {
         try {
-            return new SpyReferencedClient<V>(true,resolvedHosts,new MemcachedClient(factory,resolvedHosts));
+            return new SpyReferencedClient(true,resolvedHosts,new MemcachedClient(factory,resolvedHosts));
         } catch (IOException e) {
             return SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT;
         }

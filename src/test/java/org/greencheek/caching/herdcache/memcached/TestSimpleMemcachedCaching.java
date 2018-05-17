@@ -565,20 +565,62 @@ public class TestSimpleMemcachedCaching {
 
     }
 
+    private void testHashAlgorithmViaDynamicCache(HashAlgorithm algo) {
+        cache = new SpyMemcachedCache<String>(
+                new ElastiCacheCacheConfigBuilder()
+                        .setMemcachedHosts("localhost:" + memcached.getPort())
+                        .setTimeToLive(Duration.ofSeconds(60))
+                        .setProtocol(ConnectionFactoryBuilder.Protocol.TEXT)
+                        .setWaitForMemcachedSet(true)
+                        .setHashAlgorithm(algo)
+                        .setKeyPrefix(Optional.of("elastic"))
+                        .setResolveHostsFromDns(true)
+                        .buildMemcachedConfig()
+        );
+
+        ListenableFuture<String> val = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value1";
+        }, executorService);
+
+        ListenableFuture<String> val2 = cache.apply("Key1", () -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return "value2";
+        }, executorService);
+
+
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val, null));
+        assertEquals("Value should be key1", "value1", cache.awaitForFutureOrElse(val2, null));
+
+        assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());
+
+    }
+
     @Test
     public void testJenkinsHashAlgorithm() {
         testHashAlgorithm(new JenkinsHash());
+        testHashAlgorithmViaDynamicCache(new JenkinsHash());
     }
 
 
     @Test
     public void testXXHashAlgorithm() {
         testHashAlgorithm(new XXHashAlogrithm());
+        testHashAlgorithmViaDynamicCache(new XXHashAlogrithm());
     }
 
     @Test
     public void testAsciiXXHashAlgorithm() {
         testHashAlgorithm(new AsciiXXHashAlogrithm());
+        testHashAlgorithmViaDynamicCache(new AsciiXXHashAlogrithm());
     }
 
     @Test

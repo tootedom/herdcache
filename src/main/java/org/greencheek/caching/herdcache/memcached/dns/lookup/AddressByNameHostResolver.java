@@ -29,40 +29,37 @@ public class AddressByNameHostResolver implements HostResolver {
     @Override
     public List<InetSocketAddress> returnSocketAddressesForHostNames(List<Host> nodes, Duration dnsLookupTimeout) {
         LookupService addressLookupService = LookupService.create();
-
         List<InetSocketAddress> workingNodes = new ArrayList<InetSocketAddress>(nodes.size());
-        for (Host hostAndPort : nodes) {
-            Future<InetAddress> future = null;
-            String host = hostAndPort.getHost();
-            int port = hostAndPort.getPort();
-            try {
-                future = addressLookupService.getByName(host);
-                InetAddress ia = future.get(dnsLookupTimeout.getSeconds(), TimeUnit.SECONDS);
-                if (ia == null) {
-                    logger.error("Unable to resolve dns entry for the host: {}", host);
-                }
-                else
-                {
-                    try {
-                        workingNodes.add(new InetSocketAddress(ia,port));
-                    }
-                    catch (IllegalArgumentException e) {
-                        logger.error("Invalid port number has been provided for the memcached node: host({}),port({})", host, port);
-                    }
-                }
-            }
-            catch(TimeoutException e) {
-                logger.error("Problem resolving host name ({}) to an ip address in fixed number of seconds: {}", host, dnsLookupTimeout, e);
-            }
-            catch(Exception e) {
-                logger.error("Problem resolving host name to ip address: {}", host,e);
-            }
-            finally {
-                if (future != null) future.cancel(true);
-            }
-        }
-        addressLookupService.shutdown();
+        try {
 
+            for (Host hostAndPort : nodes) {
+                Future<InetAddress> future = null;
+                String host = hostAndPort.getHost();
+                int port = hostAndPort.getPort();
+                try {
+                    future = addressLookupService.getByName(host);
+                    InetAddress ia = future.get(dnsLookupTimeout.getSeconds(), TimeUnit.SECONDS);
+                    if (ia == null) {
+                        logger.error("Unable to resolve dns entry for the host: {}", host);
+                    } else {
+                        try {
+                            workingNodes.add(new InetSocketAddress(ia, port));
+                        } catch (IllegalArgumentException e) {
+                            logger.error("Invalid port number has been provided for the memcached node: host({}),port({})", host, port);
+                        }
+                    }
+                } catch (TimeoutException e) {
+                    logger.error("Problem resolving host name ({}) to an ip address in fixed number of seconds: {}", host, dnsLookupTimeout, e);
+                } catch (Exception e) {
+                    logger.error("Problem resolving host name to ip address: {}", host, e);
+                } finally {
+                    if (future != null) future.cancel(true);
+                }
+            }
+        } finally {
+            addressLookupService.shutdown();
+        }
         return workingNodes;
+
     }
 }

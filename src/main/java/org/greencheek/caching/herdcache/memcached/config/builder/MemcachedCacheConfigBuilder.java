@@ -59,6 +59,8 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
     private LocatorFactory locatorFactory = LocatorFactory.KETAMA_CEILING_ARRAY;
     private CompressionAlgorithm compressionAlgorithm = CompressionAlgorithm.SNAPPY;
     private boolean herdProtectionEnabled = true;
+    private boolean resolveHostsFromDns = false;
+    private Duration resolveHostsFromDnsEvery = Duration.ofMillis((30000));  // 30 seconds
 
     private Scheduler waitForMemcachedSetRxScheduler = Schedulers.io();
     private KeyValidationType keyValidationType = KeyValidationType.BY_HASHING_TYPE;
@@ -84,7 +86,9 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                locatorFactory,
                herdProtectionEnabled,
                waitForMemcachedSetRxScheduler,
-               keyValidationType);
+               keyValidationType,
+               resolveHostsFromDns,
+               resolveHostsFromDnsEvery);
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -277,6 +281,16 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setKeyValidationType(KeyValidationType type) {
         this.keyValidationType = type;
+        return self();
+    }
+
+    public T setResolveHostsFromDns(boolean resolveHostsFromDns) {
+        this.resolveHostsFromDns = resolveHostsFromDns;
+        return self();
+    }
+
+    public T setResolveHostsFromDnsEvery(Duration resolveHostsFromDnsEvery) {
+        this.resolveHostsFromDnsEvery = resolveHostsFromDnsEvery;
         return self();
     }
 }

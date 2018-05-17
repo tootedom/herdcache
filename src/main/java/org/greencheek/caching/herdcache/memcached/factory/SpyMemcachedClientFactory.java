@@ -1,12 +1,9 @@
 package org.greencheek.caching.herdcache.memcached.factory;
 
-import net.spy.memcached.ConnectionFactory;
-import net.spy.memcached.MemcachedClient;
 import org.greencheek.caching.herdcache.memcached.config.Host;
 import org.greencheek.caching.herdcache.memcached.config.hostparsing.HostStringParser;
 import org.greencheek.caching.herdcache.memcached.dns.lookup.HostResolver;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.List;

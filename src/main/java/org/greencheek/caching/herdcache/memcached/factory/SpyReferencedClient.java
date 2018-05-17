@@ -79,11 +79,9 @@ public class SpyReferencedClient<V> implements ReferencedClient {
 
     @Override
     public void shutdown() {
-       client.shutdown();
+        if(client!=null) {
+            client.shutdown();
+        }
     }
 
-//    @Override
-//    public MemcachedClientIF getClient() {
-//        return client;
-//    }
 }

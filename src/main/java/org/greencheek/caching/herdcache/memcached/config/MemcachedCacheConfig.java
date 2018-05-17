@@ -48,6 +48,8 @@ public class MemcachedCacheConfig {
     private final boolean herdProtectionEnabled;
     private final Scheduler waitForMemcachedSetRxScheduler;
     private final KeyValidationType keyValidationType;
+    private final boolean resolveHostsFromDns;
+    private final Duration resolveHostsFromDnsEvery;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -79,7 +81,9 @@ public class MemcachedCacheConfig {
                                 LocatorFactory locatorFactory,
                                 boolean herdProtectionEnabled,
                                 Scheduler waitForMemcachedSetRxScheduler,
-                                KeyValidationType keyValidationType) {
+                                KeyValidationType keyValidationType,
+                                boolean resolveHostsFromDns,
+                                Duration resolveHostsFromDnsEvery) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -111,6 +115,8 @@ public class MemcachedCacheConfig {
         this.herdProtectionEnabled = herdProtectionEnabled;
         this.waitForMemcachedSetRxScheduler = waitForMemcachedSetRxScheduler;
         this.keyValidationType = keyValidationType;
+        this.resolveHostsFromDns = resolveHostsFromDns;
+        this.resolveHostsFromDnsEvery = resolveHostsFromDnsEvery;
     }
 
     public Duration getTimeToLive() {
@@ -205,6 +211,7 @@ public class MemcachedCacheConfig {
         return hasKeyPrefix;
     }
 
+
     public boolean isRemoveFutureFromInternalCacheBeforeSettingValue() {
         return removeFutureFromInternalCacheBeforeSettingValue;
     }
@@ -251,5 +258,13 @@ public class MemcachedCacheConfig {
 
     public KeyValidationType getKeyValidationType() {
         return keyValidationType;
+    }
+
+    public boolean resolveHostsFromDns() {
+        return resolveHostsFromDns;
+    }
+
+    public Duration getDurationForResolvingHostsFromDns() {
+        return resolveHostsFromDnsEvery;
     }
 }

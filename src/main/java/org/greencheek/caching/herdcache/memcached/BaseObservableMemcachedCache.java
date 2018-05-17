@@ -37,7 +37,7 @@ import java.util.function.Supplier;
 /**
  *
  */
-class BaseObservableMemcachedCache<V extends Serializable> implements ObservableCache<V>
+abstract class BaseObservableMemcachedCache<V extends Serializable> implements ObservableCache<V>
 {
 
 
@@ -52,6 +52,7 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
     public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {
         return new SpyMemcachedReferencedClientFactory<>(createMemcachedConnectionFactory(config.getMemcachedCacheConfig()));
     }
+
 
 
 
@@ -73,12 +74,20 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
     private final long millisToWaitForDelete;
     private final boolean waitForMemcachedSet;
 
+    public BaseObservableMemcachedCache(MemcachedCacheConfig config) {
+        this(null,config);
+    }
+
     public BaseObservableMemcachedCache(
             MemcachedClientFactory clientFactory,
             MemcachedCacheConfig config) {
         this.config = config;
         cacheKeyCreator = CacheKeyCreatorFactory.DEFAULT_INSTANCE.create(config);
-        this.clientFactory = clientFactory;
+        if(clientFactory == null) {
+            this.clientFactory = buildClientFactory(config);
+        } else {
+            this.clientFactory = clientFactory;
+        }
 
         int maxCapacity = config.getMaxCapacity();
 
@@ -96,6 +105,8 @@ class BaseObservableMemcachedCache<V extends Serializable> implements Observable
 
         waitForMemcachedSet = config.isWaitForMemcachedSet();
     }
+
+    public abstract MemcachedClientFactory buildClientFactory(Object cfg);
 
     private ConcurrentMap createInternalCache(boolean createCache,
                                             int initialCapacity,
