@@ -9,6 +9,7 @@ import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.Elast
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.ElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.elasticacheconfig.client.LocalhostElastiCacheServerConnectionDetails;
 import org.greencheek.caching.herdcache.memcached.factory.ElastiCacheClientFactory;
+import org.greencheek.caching.herdcache.memcached.factory.MemcachedClientFactory;
 import org.greencheek.caching.herdcache.memcached.factory.ReferencedClientFactory;
 
 import java.io.Serializable;
@@ -44,6 +45,29 @@ public class ElastiCacheMemcachedCache<V extends Serializable> extends BaseMemca
         ),mConfig);
     }
 
+
+    @Override
+    public MemcachedClientFactory buildClientFactory(Object cfg) {
+        ElastiCacheCacheConfig config = (ElastiCacheCacheConfig) cfg;
+        MemcachedCacheConfig mConfig = config.getMemcachedCacheConfig();
+        return new ElastiCacheClientFactory(
+                createReferenceClientFactory(config),
+                ElastiCacheConfigHostsParser.parseElastiCacheConfigHosts(config.getElastiCacheConfigHosts()),
+                config.getConfigPollingTime(),
+                config.getInitialConfigPollingDelay(),
+                config.getIdleReadTimeout(),
+                config.getReconnectDelay(),
+                config.getDelayBeforeClientClose(),
+                mConfig.getHostResolver(),
+                mConfig.getDnsConnectionTimeout(),
+                config.isUpdateConfigVersionOnDnsTimeout(),
+                config.getNumberOfConsecutiveInvalidConfigurationsBeforeReconnect(),
+                config.getConnectionTimeoutInMillis(),
+                config.getClusterUpdatedObservers(),
+                config.getConfigUrlUpdater(),
+                config.isUpdateConfigOnlyOnVersionChange());
+
+    }
 
 
 

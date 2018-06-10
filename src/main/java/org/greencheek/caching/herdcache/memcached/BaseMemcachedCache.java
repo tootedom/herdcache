@@ -37,7 +37,7 @@ import java.util.function.Supplier;
 /**
  *
  */
- class BaseMemcachedCache<V extends Serializable> implements RequiresShutdown,ClearableCache,
+ abstract class BaseMemcachedCache<V extends Serializable> implements RequiresShutdown,ClearableCache,
         SerializableOnlyCacheWithExpiry<V>, RevalidateInBackgroundCapableCache<V>
 {
 
@@ -91,12 +91,22 @@ import java.util.function.Supplier;
     private final CacheKeyCreator cacheKeyCreator;
 
 
+    public BaseMemcachedCache(MemcachedCacheConfig config) {
+        this(null,config);
+    }
+
     public BaseMemcachedCache(
             MemcachedClientFactory clientFactory,
             MemcachedCacheConfig config) {
         this.config = config;
+        if(clientFactory == null) {
+            this.clientFactory = buildClientFactory(config);
+        } else {
+            this.clientFactory = clientFactory;
+        }
+
+
         cacheKeyCreator = CacheKeyCreatorFactory.DEFAULT_INSTANCE.create(config);
-        this.clientFactory = clientFactory;
 
         int maxCapacity = config.getMaxCapacity();
 
@@ -141,6 +151,9 @@ import java.util.function.Supplier;
 
         staleCacheWriter = new NoWaitForCacheWrite(metricRecorder);
     }
+
+    public abstract MemcachedClientFactory buildClientFactory(Object cfg);
+
 
     private ConcurrentMap createInternalCache(boolean createCache,
                                             int initialCapacity,
