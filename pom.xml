@@ -71,7 +71,7 @@
 
 
         <!-- java9 amn not available yet -->
-        <metrics.version>4.0.0</metrics.version>
+        <metrics.version>4.0.1</metrics.version>
         <rx.version>1.3.4</rx.version>
 
 
