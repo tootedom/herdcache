@@ -31,6 +31,8 @@ public class BackgroundDnsResolver implements ReferencedClientHolder {
     private final AtomicReference<Holder> client = new AtomicReference(EMPTY);
 
     private final ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService shutdownOldClientExecutor = Executors.newSingleThreadScheduledExecutor();
+
     private final AddressResolver resolver;
     private final Host host;
     private final ReferencedClientFactory connnectionFactory;
@@ -86,7 +88,20 @@ public class BackgroundDnsResolver implements ReferencedClientHolder {
                     if (haveAddressesChanged(addresses, existingAddresses)) {
                         ReferencedClient referencedClient = connnectionFactory.createClient(toSocketAddresses(addresses));
                         if (referencedClient != SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT) {
+                            final Holder oldClient = client.get();
                             client.set(new Holder(referencedClient, addresses));
+                            shutdownOldClientExecutor.schedule(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        LOG.info("Shutting down old cache client");
+                                        oldClient.client.shutdown();
+                                    } catch(Throwable e) {
+                                        LOG.warn("Error shutting down old client",e);
+                                    }
+                                }
+                            }, 5000, TimeUnit.MILLISECONDS);
+
                         }
                         LOG.debug("[{}] Addresses available: {}", host, toCommaSeparated(addresses));
                     } else {
@@ -158,6 +173,7 @@ public class BackgroundDnsResolver implements ReferencedClientHolder {
 
     public void shutdown() {
         scheduledExecutorService.shutdownNow();
+        shutdownOldClientExecutor.shutdownNow();
         client.get().client.shutdown();
     }
 
