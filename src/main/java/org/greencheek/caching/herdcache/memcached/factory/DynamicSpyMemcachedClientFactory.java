@@ -51,8 +51,6 @@ public class DynamicSpyMemcachedClientFactory<V> implements MemcachedClientFacto
 
     @Override
     public void shutdown() {
-        if(isEnabled()) {
-            memcached.shutdown();
-        }
+        memcached.shutdown();
     }
 }
