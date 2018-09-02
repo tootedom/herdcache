@@ -51,13 +51,13 @@ public class SpyReferencedClient<V> implements ReferencedClient {
             Future<Object> future =  client.asyncGet(key);
             value = future.get(timeout,unit);
         } catch ( OperationTimeoutException | CheckedOperationTimeoutException e) {
-            logger.warn("timeout when retrieving key {} from memcached",key);
+            logger.warn("timeout when retrieving key {} from memcached.  Error: {}", key, e.getMessage());
         } catch (TimeoutException e) {
-            logger.warn("timeout when retrieving key {} from memcached", key);
+            logger.warn("timeout when retrieving key {} from memcached.  Error: {}", key, e.getMessage());
         } catch(Exception e) {
-            logger.warn("Unable to contact memcached for get({}): {}", key, e.getMessage());
+            logger.warn("Unable to contact memcached for get({}).  Error: {}", key, e.getMessage());
         } catch(Throwable e) {
-            logger.warn("Exception thrown when communicating with memcached for get({}): {}", key, e.getMessage());
+            logger.warn("Exception thrown when communicating with memcached for get({}).  Error: {}", key, e.getMessage());
         }
         return value;
     }

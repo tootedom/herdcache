@@ -37,11 +37,11 @@ public class WaitForCacheWrite implements CacheWrite {
             try {
                 futureSet.get(waitForSetDurationInMillis, TimeUnit.MILLISECONDS);
             } catch (Throwable e) {
-                LOGGER.warn("Exception waiting for memcached set to occur for key {}", key, e);
+                LOGGER.warn("Exception waiting for memcached set to occur for key {}.  Error: {}", key, e.getMessage(), e);
             }
 
         } catch (Throwable e) {
-            LOGGER.warn("Exception performing memcached set for key {}",key, e);
+            LOGGER.warn("Exception performing memcached set for key {}.  Error: {}",key, e.getMessage(), e);
         }
     }
 }

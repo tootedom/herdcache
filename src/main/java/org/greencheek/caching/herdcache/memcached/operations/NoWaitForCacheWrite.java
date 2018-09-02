@@ -30,7 +30,7 @@ public class NoWaitForCacheWrite implements CacheWrite {
             metricRecorder.incrementCounter(CacheMetricStrings.CACHE_TYPE_DISTRIBUTED_CACHE_WRITES_COUNTER);
             client.set(key, entryTTLInSeconds, valueToCache);
         } catch (Throwable e) {
-            LOGGER.warn("Exception performing memcached set for key {}",key, e);
+            LOGGER.warn("Exception performing memcached set for key {}.  Error {}",key, e.getMessage(), e);
         }
     }
 }
