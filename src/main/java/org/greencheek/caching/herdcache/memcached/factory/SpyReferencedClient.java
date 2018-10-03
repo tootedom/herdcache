@@ -57,7 +57,7 @@ public class SpyReferencedClient<V> implements ReferencedClient {
         } catch(Exception e) {
             logger.warn("Unable to contact memcached for get({}).  Error: {}", key, e.getMessage(), e);
         } catch(Throwable e) {
-            logger.warn("Exception thrown when communicating with memcached for get({}).  Error: {}", key, e.getMessage());
+            logger.warn("Exception thrown when communicating with memcached for get({}).  Error: {}", key, e.getMessage(),e);
         }
         return value;
     }
