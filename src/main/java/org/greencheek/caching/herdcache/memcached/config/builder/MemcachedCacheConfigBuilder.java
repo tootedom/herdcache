@@ -24,6 +24,7 @@ import rx.schedulers.Schedulers;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  *
@@ -64,6 +65,7 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     private Scheduler waitForMemcachedSetRxScheduler = Schedulers.io();
     private KeyValidationType keyValidationType = KeyValidationType.BY_HASHING_TYPE;
+    private Optional<ExecutorService> listenerCallbackService = Optional.empty();
 
     public MemcachedCacheConfig buildMemcachedConfig()
     {
@@ -88,7 +90,9 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
                waitForMemcachedSetRxScheduler,
                keyValidationType,
                resolveHostsFromDns,
-               resolveHostsFromDnsEvery);
+               resolveHostsFromDnsEvery,
+               listenerCallbackService.orElse(null)
+       );
     }
 
     public T setCompressionAlgorithm(CompressionAlgorithm algorithm) {
@@ -291,6 +295,11 @@ public abstract class MemcachedCacheConfigBuilder<T extends MemcachedCacheConfig
 
     public T setResolveHostsFromDnsEvery(Duration resolveHostsFromDnsEvery) {
         this.resolveHostsFromDnsEvery = resolveHostsFromDnsEvery;
+        return self();
+    }
+
+    public T setListenerCallbackService(Optional<ExecutorService> executorService) {
+        this.listenerCallbackService = executorService;
         return self();
     }
 }

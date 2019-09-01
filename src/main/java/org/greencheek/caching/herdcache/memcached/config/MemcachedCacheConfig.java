@@ -11,6 +11,7 @@ import rx.Scheduler;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  *
@@ -50,6 +51,7 @@ public class MemcachedCacheConfig {
     private final KeyValidationType keyValidationType;
     private final boolean resolveHostsFromDns;
     private final Duration resolveHostsFromDnsEvery;
+    private final ExecutorService listenerCallbackExecutor;
 
 
     public MemcachedCacheConfig(Duration timeToLive,
@@ -83,7 +85,8 @@ public class MemcachedCacheConfig {
                                 Scheduler waitForMemcachedSetRxScheduler,
                                 KeyValidationType keyValidationType,
                                 boolean resolveHostsFromDns,
-                                Duration resolveHostsFromDnsEvery) {
+                                Duration resolveHostsFromDnsEvery,
+                                ExecutorService listenerCallbackExecutor) {
         this.timeToLive =  timeToLive;
         this.maxCapacity = maxCapacity;
         this.memcachedHosts = hosts;
@@ -117,6 +120,7 @@ public class MemcachedCacheConfig {
         this.keyValidationType = keyValidationType;
         this.resolveHostsFromDns = resolveHostsFromDns;
         this.resolveHostsFromDnsEvery = resolveHostsFromDnsEvery;
+        this.listenerCallbackExecutor = listenerCallbackExecutor;
     }
 
     public Duration getTimeToLive() {
@@ -267,4 +271,6 @@ public class MemcachedCacheConfig {
     public Duration getDurationForResolvingHostsFromDns() {
         return resolveHostsFromDnsEvery;
     }
+
+    public ExecutorService getListenerCallbackExecutor() { return listenerCallbackExecutor; }
 }

@@ -1,7 +1,6 @@
 package org.greencheek.caching.herdcache.memcached;
 
 
-import com.google.common.util.concurrent.MoreExecutors;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import net.spy.memcached.ConnectionFactory;
 import org.greencheek.caching.herdcache.*;
@@ -23,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Single;
 import rx.SingleSubscriber;
-import rx.functions.Action1;
 import rx.functions.Actions;
 import rx.schedulers.Schedulers;
 
@@ -46,7 +44,7 @@ abstract class BaseObservableMemcachedCache<V extends Serializable> implements O
                 config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
                 config.getProtocol(),config.getReadBufferSize(),config.getKeyHashType(),
-                config.getLocatorFactory(), config.getKeyValidationType(),MoreExecutors.newDirectExecutorService());
+                config.getLocatorFactory(), config.getKeyValidationType(), config.getListenerCallbackExecutor());
     }
 
     public static ReferencedClientFactory createReferenceClientFactory(ElastiCacheCacheConfig config) {
