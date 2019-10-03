@@ -28,7 +28,7 @@ public class StaticLoggerMemcachedConnection extends MemcachedConnection {
      * @param opfactory the operation factory.
      * @throws java.io.IOException if a connection attempt fails early
      */
-    public StaticLoggerMemcachedConnection(int bufSize, ConnectionFactory f, List<InetSocketAddress> a, Collection<ConnectionObserver> obs, FailureMode fm, OperationFactory opfactory) throws IOException {
+    public StaticLoggerMemcachedConnection(int bufSize, NoValidationConnectionFactory f, List<InetSocketAddress> a, Collection<ConnectionObserver> obs, FailureMode fm, OperationFactory opfactory) throws IOException {
         super(bufSize, f, a, obs, fm, opfactory);
     }
 

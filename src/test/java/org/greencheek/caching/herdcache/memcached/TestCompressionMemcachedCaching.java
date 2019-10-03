@@ -125,6 +125,8 @@ public class TestCompressionMemcachedCaching {
         ListenableFuture<String> val = cache.apply(key, () -> TestCacheValues.LARGE_CACHE_VALUE, executorService);
 
         assertEquals("Value should be key1", TestCacheValues.LARGE_CACHE_VALUE, cache.awaitForFutureOrElse(val, null));
+//        System.out.println(cache.get(key).get());
+
         assertEquals("Value should be key1", TestCacheValues.LARGE_CACHE_VALUE, cache.get(key).get());
 
         assertEquals(1, memcached.getDaemon().getCache().getCurrentItems());

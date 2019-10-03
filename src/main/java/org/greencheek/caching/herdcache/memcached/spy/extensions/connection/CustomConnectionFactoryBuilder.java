@@ -20,6 +20,14 @@ public class CustomConnectionFactoryBuilder extends ConnectionFactoryBuilder {
 
     protected LocatorFactory locatorFactory = LocatorFactory.DO_NOTHING;
 
+    private ExecutorService customExecutorService;
+
+    public void setCustomExecutorService(ExecutorService service) {
+        if (service != null) {
+            customExecutorService = service;
+        }
+    }
+
     /**
      * Set the locator type.
      */
@@ -31,8 +39,8 @@ public class CustomConnectionFactoryBuilder extends ConnectionFactoryBuilder {
     /**
      * Get the ConnectionFactory set up with the provided parameters.
      */
-    public ConnectionFactory build(boolean doKeyValidation) {
-        return new NoValidationConnectionFactory(doKeyValidation) {
+    public NoValidationConnectionFactory build(boolean doKeyValidation) {
+        return new NoValidationConnectionFactory(doKeyValidation, customExecutorService, this) {
 
             @Override
             public BlockingQueue<Operation> createOperationQueue() {
@@ -137,15 +145,6 @@ public class CustomConnectionFactoryBuilder extends ConnectionFactoryBuilder {
                 return collector == null ? super.getMetricCollector() : collector;
             }
 
-            @Override
-            public ExecutorService getListenerExecutorService() {
-                return executorService == null ? super.getListenerExecutorService() : executorService;
-            }
-
-            @Override
-            public boolean isDefaultExecutorService() {
-                return executorService == null;
-            }
         };
 
     }

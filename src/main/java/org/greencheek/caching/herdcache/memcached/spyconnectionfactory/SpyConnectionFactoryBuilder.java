@@ -5,6 +5,7 @@ import net.spy.memcached.transcoders.Transcoder;
 import org.greencheek.caching.herdcache.memcached.config.KeyValidationType;
 import org.greencheek.caching.herdcache.memcached.keyhashing.*;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.CustomConnectionFactoryBuilder;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.NoValidationConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.spy.extensions.locator.LocatorFactory;
 
 import java.util.concurrent.ExecutorService;
@@ -14,7 +15,7 @@ import java.util.concurrent.ExecutorService;
  */
 public class SpyConnectionFactoryBuilder {
 
-    public static ConnectionFactory createConnectionFactory(
+    public static NoValidationConnectionFactory createConnectionFactory(
             FailureMode failureMode,
             HashAlgorithm hashAlgorithm,
             Transcoder<Object> serializingTranscoder,
@@ -29,7 +30,7 @@ public class SpyConnectionFactoryBuilder {
                                        protocol,readBufferSize,keyHashType,locatorFactory,keyValidationType,null);
     }
 
-    public static ConnectionFactory createConnectionFactory(
+    public static NoValidationConnectionFactory createConnectionFactory(
             FailureMode failureMode,
             HashAlgorithm hashAlgorithm,
             Transcoder<Object> serializingTranscoder,
@@ -47,8 +48,8 @@ public class SpyConnectionFactoryBuilder {
         builder.setFailureMode(failureMode);
         builder.setTranscoder(serializingTranscoder);
         builder.setLocatorFactory(locatorFactory);
-        if (executorService !=null) {
-            builder.setListenerExecutorService(executorService);
+        if (executorService != null) {
+            builder.setCustomExecutorService(executorService);
         }
 
         return builder.build(keyValidationRequired(keyHashType,keyValidationType));

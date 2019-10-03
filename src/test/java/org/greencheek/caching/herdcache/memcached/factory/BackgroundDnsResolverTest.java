@@ -1,10 +1,12 @@
 package org.greencheek.caching.herdcache.memcached.factory;
 
 import net.spy.memcached.ConnectionFactory;
+import net.spy.memcached.MemcachedClient;
 import org.greencheek.caching.herdcache.memcached.config.Host;
 import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.config.builder.ElastiCacheCacheConfigBuilder;
 import org.greencheek.caching.herdcache.memcached.dns.AddressResolver;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.NoValidationConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,9 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.*;
 
 public class BackgroundDnsResolverTest {
 
@@ -54,7 +54,7 @@ public class BackgroundDnsResolverTest {
     @Before
     public void setUp() {
         MemcachedCacheConfig config = new ElastiCacheCacheConfigBuilder().buildMemcachedConfig();
-        ConnectionFactory factory =  SpyConnectionFactoryBuilder.createConnectionFactory(
+        NoValidationConnectionFactory factory =  SpyConnectionFactoryBuilder.createConnectionFactory(
                 config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),
                 config.getProtocol(), config.getReadBufferSize(), config.getKeyHashType(),
@@ -171,6 +171,59 @@ public class BackgroundDnsResolverTest {
             assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
             Thread.sleep(13000);
             ReferencedClient client2 = resolver.getClient();
+            assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
+            assertNotSame(client, client2);
+
+            List<InetSocketAddress> sockAddys = client2.getResolvedHosts();
+
+            assertEquals(2, sockAddys.size());
+            for(InetSocketAddress addy : sockAddys) {
+                System.out.println(addy.getAddress().getHostAddress());
+            }
+
+        }
+        finally {
+            resolver.shutdown();
+        }
+
+    }
+
+    @Test
+    public void updateOfDnsIsChangedAndFaultyAddressRemovedAndListenerIsAwake() throws UnknownHostException, InterruptedException {
+
+        InetAddress[] addresses1 = new InetAddress[3];
+
+        addresses1[0] = InetAddress.getByName("127.0.0.100");
+        addresses1[1] = InetAddress.getByName("127.0.0.2");
+        addresses1[2] = InetAddress.getByName("127.0.0.1");
+
+        InetAddress[] addresses2 = new InetAddress[3];
+        addresses2[0] = InetAddress.getByName("127.0.53.53");
+        addresses2[1] = InetAddress.getByName("127.0.0.4");
+        addresses2[2] = InetAddress.getByName("127.0.0.5");
+
+
+        SimpleCircularAddressResolver addressResolver = new SimpleCircularAddressResolver(new InetAddress[][]{addresses1,addresses2});
+        CountDownLatch latch = addressResolver.getStartSignal();
+        BackgroundDnsResolver resolver = new BackgroundDnsResolver(new Host("bob.com",11211),10000,reffactory,addressResolver);
+        try {
+            latch.await(10000, TimeUnit.SECONDS);
+            Thread.sleep(2000);
+            ReferencedClient client = resolver.getClient();
+            assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
+            try {
+                client.get("dom", 1000, TimeUnit.MILLISECONDS);
+            } catch(Exception e) {
+                throw e;
+            }
+            Thread.sleep(16500);
+            ReferencedClient client2 = resolver.getClient();
+            assertFalse("Listener should not be shutdown",((MemcachedClient)((SpyReferencedClient)client2).getMemcachedClient()).getExecutorService().isShutdown());
+            try {
+                client2.get("dom", 1000, TimeUnit.MILLISECONDS);
+            } catch(Exception e) {
+                throw e;
+            }
             assertNotSame(client, SpyReferencedClient.UNAVAILABLE_REFERENCE_CLIENT);
             assertNotSame(client, client2);
 

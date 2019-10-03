@@ -10,6 +10,7 @@ import org.greencheek.caching.herdcache.memcached.config.MemcachedCacheConfig;
 import org.greencheek.caching.herdcache.memcached.factory.*;
 import org.greencheek.caching.herdcache.memcached.metrics.MetricRecorder;
 import org.greencheek.caching.herdcache.memcached.operations.*;
+import org.greencheek.caching.herdcache.memcached.spy.extensions.connection.NoValidationConnectionFactory;
 import org.greencheek.caching.herdcache.memcached.spyconnectionfactory.SpyConnectionFactoryBuilder;
 import org.greencheek.caching.herdcache.memcached.util.CacheMetricStrings;
 import org.greencheek.caching.herdcache.util.CacheKeyCreatorFactory;
@@ -39,7 +40,7 @@ abstract class BaseObservableMemcachedCache<V extends Serializable> implements O
 {
 
 
-    public static ConnectionFactory createMemcachedConnectionFactory(MemcachedCacheConfig config) {
+    public static NoValidationConnectionFactory createMemcachedConnectionFactory(MemcachedCacheConfig config) {
         return SpyConnectionFactoryBuilder.createConnectionFactory(
                 config.getFailureMode(),
                 config.getHashAlgorithm(), config.getSerializingTranscoder(),

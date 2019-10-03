@@ -84,4 +84,8 @@ public class SpyReferencedClient<V> implements ReferencedClient {
         }
     }
 
+    // Only for testing, not to be used anywhere else.
+    public MemcachedClientIF getMemcachedClient() {
+        return client;
+    }
 }
