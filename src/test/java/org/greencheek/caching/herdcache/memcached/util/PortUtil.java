@@ -11,7 +11,7 @@ public class PortUtil {
     public static ServerSocket findFreePort() {
         ServerSocket server = null;
         try {
-            server = new ServerSocket(0,1000, InetAddress.getLocalHost());
+            server = new ServerSocket(0,1000, InetAddress.getLoopbackAddress());
             server.setReuseAddress(true);
         } catch (IOException e) {
             e.printStackTrace();
