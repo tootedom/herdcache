@@ -50,7 +50,7 @@
         <maven-plugin-plugin.version>3.5</maven-plugin-plugin.version>
         <maven-shade-plugin.version>3.1.0.1</maven-shade-plugin.version>
         <maven-site-plugin.version>3.6</maven-site-plugin.version>
-        <logback.version>1.1.5</logback.version>
+        <logback.version>1.2.0</logback.version>
 
         <guava.version>19.0</guava.version>
         <concurrentlinkedhashmap.version>1.4.2</concurrentlinkedhashmap.version>
